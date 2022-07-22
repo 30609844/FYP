@@ -31,7 +31,7 @@ end
 
 function p2_2(offsets)
     abs_offsets = offsets.*sgn(offsets)
-    return sgn(offsets).*(1 .-abs_offsets).^2 .* (abs_offsets)
+    return (sgn(offsets).*(1 .-abs_offsets).^2) .* (abs_offsets)
 end
 
 # derivatives
@@ -118,3 +118,19 @@ end
 p5 = [p5_1,p5_2,p5_3,p5_4,p5_5]
 
 p_i = [p1,p2,p3,p4,p5] # list of lists of basis splines for different orders
+
+using Plots
+x = LinRange(-1,1,100)'
+y = LinRange(-1,1,100)
+t = LinRange(-1,1,100)
+z = zeros(length(x),length(y),length(t))
+for i in 1:length(t)
+	z[:,:,i] = (p3_2(y) * p4_2(x))*p2_2(t)[i]
+end
+anim = @animate for i ∈ 1:length(t)
+	t = LinRange(-1,1,100)
+	t = round(t[i],digits=2)
+	plot(x',y,z[:,:,i],linetype=:contourf,xlabel = "x",ylabel= "y",title = "$t s",clim=(-1,1))
+end
+gif(anim, "Velocity_profile_evolution.gif", fps = 50)
+	
