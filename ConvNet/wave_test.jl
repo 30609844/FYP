@@ -1,5 +1,5 @@
 using Flux, Statistics
-using Flux: onehotbatch, onecold, crossentropy, throttle
+using Flux: onehotbatch, onecold, crossentropy, throttle, unsqueeze
 using Base.Iterators: repeated, partition
 using Printf
 
@@ -119,6 +119,19 @@ p5 = [p5_1,p5_2,p5_3,p5_4,p5_5]
 
 p_i = [p1,p2,p3,p4,p5] # list of lists of basis splines for different orders
 
+function p_multidim(offsets,orders,indices)
+	"""
+	multidimensional basis spline of specified orders and indices
+	:offsets: offsets of size: bs x n_dims x ...
+	:orders: orders of spline for each dimension (note: counting starts at 0 => 0 ~ 1st order, 1 ~ 2nd order, 2 ~ 3rd order)
+	:indices: indices of spline for each dimension (note: counting starts at 0)
+	"""
+	# return torch.prod(torch.cat([p_i[orders[i]][indices[i]](offsets[:,i:(i+1)]).unsqueeze(0) for i in range(len(orders))]),dim=0)
+	# torch.cat([p_i[orders[i]][indices[i]](offsets[:,i:(i+1)]).unsqueeze(0) for i in range(len(orders))])
+	return prod(cat([unsqueeze(p_i[orders[i]][indices[i]](offsets[:,i:(i+1)]),3) for i in 1:length(orders)]),0)
+	unsqueeze(p_i[orders[1]][indices[1]](offsets[:,1:2]),1)
+end
+
 using Plots
 x = LinRange(-1,1,100)'
 y = LinRange(-1,1,100)
@@ -127,10 +140,10 @@ z = zeros(length(x),length(y),length(t))
 for i in 1:length(t)
 	z[:,:,i] = (p3_2(y) * p4_2(x))*p2_2(t)[i]
 end
-anim = @animate for i ∈ 1:length(t)
-	t = LinRange(-1,1,100)
-	t = round(t[i],digits=2)
-	plot(x',y,z[:,:,i],linetype=:contourf,xlabel = "x",ylabel= "y",title = "$t s",clim=(-1,1))
-end
-gif(anim, "Velocity_profile_evolution.gif", fps = 50)
+# anim = @animate for i ∈ 1:length(t)
+# 	t = LinRange(-1,1,100)
+# 	t = round(t[i],digits=2)
+# 	plot(x',y,z[:,:,i],linetype=:contourf,xlabel = "x",ylabel= "y",title = "$t s",clim=(-1,1))
+# end
+# gif(anim, "Velocity_profile_evolution.gif", fps = 50)
 	
