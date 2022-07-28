@@ -258,6 +258,14 @@ function plot_T()
         p2 = plot(xs,ys,Tdata',linetype=:contourf,clim=(0,1),title = "")
         plot(p1,p2)
 end
+
+function plot_p()
+        xs = LinRange(xspan[1],xspan[end],257)
+        ys = LinRange(yspan[1],yspan[end],257)
+        p_predict = reshape([Array(phi[3]([x,y],minimizers_[3]))[1] for x in xs for y in ys],(length(xs),length(ys)))
+        p1 = plot(xs,ys,p_predict,linetype=:contourf,clim=(0,1))
+        plot(p1)
+end
         # xs = LinRange(xspan[1],xspan[end],257)
         # ys = LinRange(yspan[1],yspan[end],257)
         # T_predict = reshape([Array(phi[4]([x,y],minimizers_[4]))[1] for x in xs for y in ys],(length(xs),length(ys)))
