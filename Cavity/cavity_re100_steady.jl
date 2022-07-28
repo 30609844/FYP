@@ -168,7 +168,7 @@ end
 loss_functions = [pde_loss_functions; bc_loss_functions; u_loss; v_loss; T_loss]    
 
 pde_weights = [1,1,1,1]
-bc_weights = [1,1,1,1,1,1,1,1,1,1,1,1,1]
+bc_weights = 100*[1,1,1,1,1,1,1,1,1,1,1,1,1]
 data_weights = [1,1,1000]
 λ = [pde_weights;bc_weights;data_weights]
 λ = λ/norm(λ)
