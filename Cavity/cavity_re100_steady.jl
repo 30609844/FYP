@@ -18,7 +18,7 @@ Dyy = Differential(y)^2
 Re = 100; Pe = 100;
 ρ = 1.0; μ = 1/Re; k = 1/Pe; g = 0.0;
 
-# 3D NSE + Temperature equation for cylindrical coords (My god this is horrible I want to die)
+## 2D NSE + Heat eqn (steady)
 eqs = [
         Dx(u(x,y)) + Dy(v(x,y)) ~ 0,
 
@@ -93,15 +93,15 @@ bcs = [
 input_ = length(indvars)
 dx = [1/33,1/33]  
 act_func = Flux.tanh_fast
-# n = 60
-# chain = [FastChain(FastDense(input_,n,act_func),
-#                 FastDense(n,n,act_func),
-#                 FastDense(n,n,act_func),
-#                 FastDense(n,n,act_func),
-#                 FastDense(n,1)) for _ in 1:length(depvars)
-# ] 
 n = 60
-chain = [FastChain(FastDense(input_,n,act_func),FastDense(n,n,act_func),FastDense(n,1)) for _ in 1:length(eqs)]
+chain = [FastChain(FastDense(input_,n,act_func),
+                FastDense(n,n,act_func),
+                FastDense(n,n,act_func),
+                FastDense(n,n,act_func),
+                FastDense(n,1)) for _ in 1:length(depvars)
+] 
+# n = 60
+# chain = [FastChain(FastDense(input_,n,act_func),FastDense(n,n,act_func),FastDense(n,1)) for _ in 1:length(eqs)]
 
 strategy = GridTraining(dx)
 initθ = map(c -> Float32.(c), DiffEqFlux.initial_params.(chain))
@@ -250,12 +250,20 @@ function plot_v()
         plot(p1,p2)
 end
 
+function plot_T()
         xs = LinRange(xspan[1],xspan[end],257)
         ys = LinRange(yspan[1],yspan[end],257)
         T_predict = reshape([Array(phi[4]([x,y],minimizers_[4]))[1] for x in xs for y in ys],(length(xs),length(ys)))
         p1 = plot(xs,ys,T_predict,linetype=:contourf,clim=(0,1))
-        p2 = plot(xs,ys,Tdata',linetype=:contourf,clim=(0,1))
+        p2 = plot(xs,ys,Tdata',linetype=:contourf,clim=(0,1),title = "")
         plot(p1,p2)
+end
+        # xs = LinRange(xspan[1],xspan[end],257)
+        # ys = LinRange(yspan[1],yspan[end],257)
+        # T_predict = reshape([Array(phi[4]([x,y],minimizers_[4]))[1] for x in xs for y in ys],(length(xs),length(ys)))
+        # p1 = plot(xs,ys,T_predict,linetype=:contourf,clim=(0,1))
+        # p2 = plot(xs,ys,Tdata',linetype=:contourf,clim=(0,1))
+        # plot(p1,p2)
 
 
 # function plot_polar_vz(z)
