@@ -1,15 +1,16 @@
-"""
-Created on Fri Jul  5 12:51:13 2019
+##
+# Created 31/07/22 
 
-@author: Suraj Pawar
+# @author: Kevin Liu
 
-DNS solver for decaying homegenous isotropic turbulence problem for cartesian periodic 
-domain with [0,2pi] X [0,2pi] dimension and is discretized uniformly in x and y direction. 
-The solver uses pseudo-spectral method for solving two-dimensional incompressible 
-Navier-Stokes equation in vorticity-streamfunction formulation. The solver employs 
-hybrid third-order Runge-Kutta implicit Crank-Nicolson scheme for time integration. 
+# DNS solver for 2D decaying homegenous isotropic turbulence problem for 
+# cartesian periodic domain [0,2pi] X [0,2pi].
+# Discretized uniformly in x and y direction
+# The solver uses pseudo-spectral method for solving 2D incompressible NSE
+# in vorticity-streamfunction formulation. The solver uses 
+# hybrid third-order Runge-Kutta implicit Crank-Nicolson scheme for time integration. 
 
-"""
+##
 using FFTW
 FFTW.set_num_threads(6)
 using Plots, DelimitedFiles
@@ -107,8 +108,8 @@ function vm_ic(nx,ny)
     xc2 = pi+pi/4.0
     yc2 = pi
     
-    x = LinRange(0.0,2.0*pi,nx)
-    y = LinRange(0.0,2.0*pi,ny)'
+    x = LinRange(0.0,2.0*pi,nx+1)
+    y = LinRange(0.0,2.0*pi,ny+1)'
     
     # x, y = np.meshgrid(x, y, indexing='ij')
     
@@ -174,23 +175,27 @@ function decay_ic(nx,ny,dx,dy)
     # ksi = [2.62022653e+00 4.52593227e+00 7.18638172e-04;1.89961158e+00 9.22094457e-01 5.80180502e-01;1.17030742e+00 2.17122208e+00 2.49296356e+00]
     # eta = [3.38548539 2.63387681 4.3053611;1.28461137 5.51737457 0.17208132;4.21267161 2.6220034  3.51035172]
     phase = zeros(Complex{Float64},nx,ny)
-    wf = Array{Complex{Int64}}(undef,nx,ny)
+    wf = Array{Complex{Float64}}(undef,nx,ny)
     
-    phase[2:Int(nx/2),2:Int(ny/2)] = complex.(cos.(ksi[2:Int(nx/2),2:Int(ny/2)] +
-                                    eta[2:Int(nx/2),2:Int(ny/2)]), sin.(ksi[2:Int(nx/2),2:Int(ny/2)] +
-                                    eta[2:Int(nx/2),2:Int(ny/2)]))
-
-    phase[end:-1:Int(nx/2)+2,2:Int(ny/2)] = complex.(cos.(-ksi[2:Int(nx/2),2:Int(ny/2)] +
-                                            eta[2:Int(nx/2),2:Int(ny/2)]), sin.(-ksi[2:Int(nx/2),2:Int(ny/2)] +
+    phase[2:Int(nx/2),2:Int(ny/2)]          = complex.(cos.(ksi[2:Int(nx/2),2:Int(ny/2)] +
+                                            eta[2:Int(nx/2),2:Int(ny/2)]), 
+                                            sin.(ksi[2:Int(nx/2),2:Int(ny/2)] +
                                             eta[2:Int(nx/2),2:Int(ny/2)]))
 
-    phase[2:Int(nx/2),end:-1:Int(ny/2)+2] = complex.(cos.(ksi[2:Int(nx/2),2:Int(ny/2)] -
-                                           eta[2:Int(nx/2),2:Int(ny/2)]), sin.(ksi[2:Int(nx/2),2:Int(ny/2)] -
-                                           eta[2:Int(nx/2),2:Int(ny/2)]))
+    phase[end:-1:Int(nx/2)+2,2:Int(ny/2)]   = complex.(cos.(-ksi[2:Int(nx/2),2:Int(ny/2)] +
+                                            eta[2:Int(nx/2),2:Int(ny/2)]), 
+                                            sin.(-ksi[2:Int(nx/2),2:Int(ny/2)] +
+                                            eta[2:Int(nx/2),2:Int(ny/2)]))
 
-    phase[end:-1:Int(nx/2)+2,end:-1:Int(ny/2)+2] = complex.(cos.(-ksi[2:Int(nx/2),2:Int(ny/2)] -
-                                                 eta[2:Int(nx/2),2:Int(ny/2)]), sin.(-ksi[2:Int(nx/2),2:Int(ny/2)] -
-                                                eta[2:Int(nx/2),2:Int(ny/2)]))
+    phase[2:Int(nx/2),end:-1:Int(ny/2)+2]   = complex.(cos.(ksi[2:Int(nx/2),2:Int(ny/2)] -
+                                            eta[2:Int(nx/2),2:Int(ny/2)]), 
+                                            sin.(ksi[2:Int(nx/2),2:Int(ny/2)] -
+                                            eta[2:Int(nx/2),2:Int(ny/2)]))
+
+    phase[end:-1:Int(nx/2)+2,end:-1:Int(ny/2)+2]    = complex.(cos.(-ksi[2:Int(nx/2),2:Int(ny/2)] -
+                                                    eta[2:Int(nx/2),2:Int(ny/2)]), 
+                                                    sin.(-ksi[2:Int(nx/2),2:Int(ny/2)] -
+                                                    eta[2:Int(nx/2),2:Int(ny/2)]))
 
     k0 = 10.0
     c = 4.0/(3.0*sqrt(pi)*(k0^5))           
@@ -267,28 +272,24 @@ function energy_spectrum(nx,ny,w)
 
     # kx, ky = np.meshgrid(kx, ky, indexing='ij')
     
-    wf = fft(w) 
+    wf = fft(w[1:end-1,1:end-1]) 
     
     es = Array{Float64}(undef,nx,ny)
     
-    kk = sqrt(kx[:,:]^2 + ky[:,:]^2)
-    es[:,:] = pi*((np.abs(wf[:,:])/(nx*ny))^2)/kk
-    
     kk = sqrt.((kx.^2)' .+ ky.^2)
     es = pi*((abs.(wf)/(nx*ny)).^2)./kk
-
+    # es = c*(kk.^4).*exp.(-(kk/k0).^2)
     n = Int(round(sqrt(nx^2 + ny^2)/2.0))-1
     
     en = zeros(n+1)
     enind = falses(nx,ny)
-    for k in 2:n+1
-        en[k] = 0.0
+    for k in 1:n
+        en[k+1] = 0.0
         ic = 0
-        ind = (kk[2:end-1,2:end-1].>2*pi/(Float64(nx)*dx)*(k-0.5)) .& (kk[2:end-1,2:end-1].<2*pi/(Float64(nx)*dx)*(k+0.5))
-        ic = length(kk[2:end-1,2:end-1][ind])
-        enind[2:end-1,2:end-1] = ind
-        en[k] = sum(es[enind])
-        en[k] = en[k]/ic
+        ind = (kk[2:end,2:end].>(k-0.5)) .& (kk[2:end,2:end].<(k+0.5))
+        ic = length(kk[2:end,2:end][ind])
+        enind[2:end,2:end] = ind
+        en[k+1] = sum(es[enind])/ic
     end
     return en, n
 end
@@ -314,7 +315,7 @@ function fps(nx,ny,dx,dy,k2,f)
     u = zeros(nx+1,ny+1)
        
     # the denominator is based on the scheme used for discrtetizing the Poisson equation
-    data1 = f/(-k2)
+    data1 = f./(-k2)
     
     # compute the inverse fourier transform
     u[1:nx,1:ny] = real(ifft(data1))
@@ -384,25 +385,25 @@ function nonlineardealiased(nx,ny,kx,ky,k2,wf)
     j3f_padded = zeros(Complex{Float64},nxe,nye)
     j4f_padded = zeros(Complex{Float64},nxe,nye)
     
-    j1f_padded[1:Int(nx/2)-1,1:Int(ny/2)-1] = j1f[1:Int(nx/2)-1,1:Int(ny/2)-1]
-    j1f_padded[Int(nxe-nx/2):end,1:Int(ny/2)-1] = j1f[Int(nx/2):end,1:Int(ny/2)]    
-    j1f_padded[1:Int(nx/2)-1,Int(nye-ny/2):end] = j1f[1:Int(nx/2)-1,Int(ny/2):end]    
-    j1f_padded[Int(nxe-nx/2):end,Int(nye-ny/2):end] =  j1f[Int(nx/2):end,Int(ny/2):end] 
+    j1f_padded[1:Int(nx/2),1:Int(ny/2)]                     = j1f[1:Int(nx/2),1:Int(ny/2)]
+    j1f_padded[Int(nxe-nx/2)+1:end,1:Int(ny/2)]             = j1f[Int(nx/2)+1:end,1:Int(ny/2)]    
+    j1f_padded[1:Int(nx/2),Int(nye-ny/2)+1:end]             = j1f[1:Int(nx/2),Int(ny/2)+1:end]    
+    j1f_padded[Int(nxe-nx/2)+1:end,Int(nye-ny/2)+1:end]     = j1f[Int(nx/2)+1:end,Int(ny/2)+1:end] 
     
-    j2f_padded[1:Int(nx/2)-1,1:Int(ny/2)-1] = j2f[1:Int(nx/2)-1,1:Int(ny/2)-1]
-    j2f_padded[Int(nxe-nx/2):endend,1:Int(ny/2)-1] = j2f[Int(nx/2):end,1:Int(ny/2)]    
-    j2f_padded[1:Int(nx/2)-1,Int(nye-ny/2):end] = j2f[1:Int(nx/2)-1,Int(ny/2):end]    
-    j2f_padded[Int(nxe-nx/2):end,Int(nye-ny/2):end] =  j2f[Int(nx/2):end,Int(ny/2):end] 
+    j2f_padded[1:Int(nx/2),1:Int(ny/2)]                     = j2f[1:Int(nx/2),1:Int(ny/2)]
+    j2f_padded[Int(nxe-nx/2)+1:endend,1:Int(ny/2)]          = j2f[Int(nx/2)+1:end,1:Int(ny/2)]    
+    j2f_padded[1:Int(nx/2),Int(nye-ny/2)+1:end]             = j2f[1:Int(nx/2),Int(ny/2)+1:end]    
+    j2f_padded[Int(nxe-nx/2)+1:end,Int(nye-ny/2)+1:end]     = j2f[Int(nx/2)+1:end,Int(ny/2)+1:end] 
     
-    j3f_padded[1:Int(nx/2)-1,1:Int(ny/2)-1] = j3f[1:Int(nx/2)-1,1:Int(ny/2)-1]
-    j3f_padded[Int(nxe-nx/2):endend,1:Int(ny/2)-1] = j3f[Int(nx/2):end,1:Int(ny/2)]    
-    j3f_padded[1:Int(nx/2)-1,Int(nye-ny/2):end] = j3f[1:Int(nx/2)-1,Int(ny/2):end]    
-    j3f_padded[Int(nxe-nx/2):end,Int(nye-ny/2):end] =  j3f[Int(nx/2):end,Int(ny/2):end] 
+    j3f_padded[1:Int(nx/2),1:Int(ny/2)]                     = j3f[1:Int(nx/2),1:Int(ny/2)]
+    j3f_padded[Int(nxe-nx/2)+1:endend,1:Int(ny/2)]          = j3f[Int(nx/2)+1:end,1:Int(ny/2)]    
+    j3f_padded[1:Int(nx/2),Int(nye-ny/2)+1:end]             = j3f[1:Int(nx/2),Int(ny/2)+1:end]    
+    j3f_padded[Int(nxe-nx/2)+1:end,Int(nye-ny/2)+1:end]     = j3f[Int(nx/2)+1:end,Int(ny/2)+1:end] 
     
-    j4f_padded[1:Int(nx/2)-1,1:Int(ny/2)-1] = j4f[1:Int(nx/2)-1,1:Int(ny/2)-1]
-    j4f_padded[Int(nxe-nx/2):endend,1:Int(ny/2)-1] = j4f[Int(nx/2):end,1:Int(ny/2)]    
-    j4f_padded[1:Int(nx/2)-1,Int(nye-ny/2):end] = j4f[1:Int(nx/2)-1,Int(ny/2):end]    
-    j4f_padded[Int(nxe-nx/2):end,Int(nye-ny/2):end] =  j4f[Int(nx/2):end,Int(ny/2):end] 
+    j4f_padded[1:Int(nx/2),1:Int(ny/2)]                     = j4f[1:Int(nx/2),1:Int(ny/2)]
+    j4f_padded[Int(nxe-nx/2)+1:endend,1:Int(ny/2)]          = j4f[Int(nx/2)+1:end,1:Int(ny/2)]    
+    j4f_padded[1:Int(nx/2),Int(nye-ny/2)+1:end]             = j4f[1:Int(nx/2),Int(ny/2)+1:end]    
+    j4f_padded[Int(nxe-nx/2)+1:end,Int(nye-ny/2)+1:end]     = j4f[Int(nx/2)+1:end,Int(ny/2)+1:end] 
     
     j1f_padded = j1f_padded*(nxe*nye)/(nx*ny)
     j2f_padded = j2f_padded*(nxe*nye)/(nx*ny)
@@ -414,16 +415,16 @@ function nonlineardealiased(nx,ny,kx,ky,k2,wf)
     j3 = real(ifft(j3f_padded))
     j4 = real(ifft(j4f_padded))
     
-    jacp = j1*j2 - j3*j4
+    jacp = j1.*j2 - j3.*j4
     
     jacpf = fft(jacp)
     
     jf = zeros(Complex{Float64},nx,ny)
     
-    jf[1:Int(nx/2)-1,1:Int(ny/2)-1] = jacpf[1:Int(nx/2)-1,1:Int(ny/2)-1]
-    jf[Int(nx/2):end,1:Int(ny/2)] = jacpf[Int(nxe-nx/2):end,1:Int(ny/2)]    
-    jf[1:Int(nx/2)-1,Int(ny/2):end] = jacpf[1:Int(nx/2)-1,Int(nye-ny/2):end]    
-    jf[Int(nx/2):end,Int(ny/2):end] =  jacpf[Int(nxe-nx/2):end,Int(nye-ny/2):end]
+    jf[1:Int(nx/2),1:Int(ny/2)]             = jacpf[1:Int(nx/2),1:Int(ny/2)]
+    jf[Int(nx/2)+1:end,1:Int(ny/2)]         = jacpf[Int(nxe-nx/2)+1:end,1:Int(ny/2)]    
+    jf[1:Int(nx/2),Int(ny/2)+1:end]         = jacpf[1:Int(nx/2),Int(nye-ny/2):end]    
+    jf[Int(nx/2)+1:end,Int(ny/2)+1:end]     = jacpf[Int(nxe-nx/2)+1:end,Int(nye-ny/2):end]
     
     jf = jf*(nx*ny)/(nxe*nye)
     
@@ -448,17 +449,17 @@ function nonlinear(nx,ny,kx,ky,k2,wf)
     #      (d(psi)/dy*d(omega)/dx - d(psi)/dx*d(omega)/dy)
     
     
-    j1f = 1.0im*kx*wf/k2
-    j2f = 1.0im*ky*wf
-    j3f = 1.0im*ky*wf/k2
-    j4f = 1.0im*kx*wf
+    j1f = 1.0im*kx.*wf./k2
+    j2f = 1.0im*ky.*wf
+    j3f = 1.0im*ky.*wf./k2
+    j4f = 1.0im*kx.*wf
     
     j1 = real(ifft(j1f))
     j2 = real(ifft(j2f))
     j3 = real(ifft(j3f))
     j4 = real(ifft(j4f))
     
-    jac = j1*j2 - j3*j4
+    jac = j1.*j2 - j3.*j4
     
     jf = fft(jac)
     
@@ -516,26 +517,33 @@ function write_data(nx,ny,dx,dy,kx,ky,k2,nxc,nyc,dxc,dyc,wf,w0,n,freq,dt)
     
     sgs = jc - jcoarse
     
-    # folder = 'data_'+string(nx) + '_v2'
-    # if not os.path.exists("spectral/"+folder):
-    #     os.makedirs("spectral/"+folder)
-    #     os.makedirs("spectral/"+folder+"/01_coarsened_jacobian_field")
-    #     os.makedirs("spectral/"+folder+"/02_jacobian_coarsened_field")
-    #     os.makedirs("spectral/"+folder+"/03_subgrid_scale_term")
-    #     os.makedirs("spectral/"+folder+"/04_vorticity")
-    #     os.makedirs("spectral/"+folder+"/05_streamfunction")
+    folder = "data_"*string(nx) * "_v2"
+    if !isdir("spectral//"*folder)
+        mkdir("spectral/"*folder)
+        mkdir("spectral/"*folder*"/01_coarsened_jacobian_field")
+        mkdir("spectral/"*folder*"/02_jacobian_coarsened_field")
+        mkdir("spectral/"*folder*"/03_subgrid_scale_term")
+        mkdir("spectral/"*folder*"/04_vorticity")
+        mkdir("spectral/"*folder*"/05_streamfunction")
+    end
+    filename = "spectral/"*folder*"/01_coarsened_jacobian_field/J_fourier_"*string(Int(round(n/freq)))*".csv"  
+    writedlm(filename,jc,',')
+    filename = "spectral/"*folder*"/02_jacobian_coarsened_field/J_coarsen_"*string(Int(round(n/freq)))*".csv"
+    writedlm(filename,jcoarse,',')
+    filename = "spectral/"*folder*"/03_subgrid_scale_term/sgs_"*string(Int(round(n/freq)))*".csv"
+    writedlm(filename,sgs,',')
+    filename = "spectral/"*folder*"/04_vorticity/w_"*string(Int(round(n/freq)))*".csv"
+    writedlm(filename,w,',')
+    filename = "spectral/"*folder*"/05_streamfunction/s_"*string(Int(round(n/freq)))*".csv"
+    writedlm(filename,s,',')
     
-    # filename = "spectral/"+folder+"/01_coarsened_jacobian_field/J_fourier_"+string(Int(n/freq))+".csv"
-    # np.savetxt(filename, jc, delimiter=",")    
-    # filename = "spectral/"+folder+"/02_jacobian_coarsened_field/J_coarsen_"+string(Int(n/freq))+".csv"
-    # np.savetxt(filename, jcoarse, delimiter=",")
-    # filename = "spectral/"+folder+"/03_subgrid_scale_term/sgs_"+string(Int(n/freq))+".csv"
-    # np.savetxt(filename, sgs, delimiter=",")
-    # filename = "spectral/"+folder+"/04_vorticity/w_"+string(Int(n/freq))+".csv"
-    # np.savetxt(filename, w, delimiter=",")
-    # filename = "spectral/"+folder+"/05_streamfunction/s_"+string(Int(n/freq))+".csv"
-    # np.savetxt(filename, s, delimiter=",")
-    
+    if mod(n,50*freq) == 0
+        l = @layout [
+            grid(1,2)
+        ]
+        c1 = plot()
+        filename = "spectral/"*folder*"/field_spectral_"*string(Int(round(n/freq)))*".png"
+    end
     # if n%(50*freq) == 0
     #     fig, axs = plt.subplots(1,2,sharey=True,figsize=(9,5))
 
@@ -627,7 +635,7 @@ ky = reshape(ky,(1,ny))
 
 data = complex.(w,0.0)
 
-wnf = fft(data,2) # fourier space forward
+wnf = fft(data) # fourier space forward
 
 #%%
 # initialize variables for time integration
