@@ -538,10 +538,9 @@ function write_data(nx,ny,dx,dy,kx,ky,k2,nxc,nyc,dxc,dyc,wf,w0,n,freq,dt)
     writedlm(filename,s,',')
     
     if mod(n,50*freq) == 0
-        l = @layout [
-            grid(1,2)
-        ]
-        c1 = plot()
+
+        c1 = plot(LinRange(0,2pi,nx),LinRange(0,2pi,ny),w0',linetype=:contourf,clim=(0,1),color=:jet)
+        c1 = plot(LinRange(0,2pi,nx),LinRange(0,2pi,ny),w',linetype=:contourf,clim=(0,1),color=:jet)
         filename = "spectral/"*folder*"/field_spectral_"*string(Int(round(n/freq)))*".png"
     end
     # if n%(50*freq) == 0
