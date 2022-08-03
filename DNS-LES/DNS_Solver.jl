@@ -57,7 +57,7 @@ function exact_tgv(nx,ny,t,re)
     y = LinRange(0.0,2.0*pi,ny+1)
     
     nq = 4.0
-    ue = 2.0*nq*cos.(nq*x)*cos.(nq*y)'*exp(-2.0*nq^2*t/re)
+    ue = @. 2.0*nq*cos(nq*x)*cos(nq*y)'*exp(-2.0*nq^2*t/re)
 
     return ue
 end
@@ -81,7 +81,7 @@ function tgv_ic(nx,ny)
     x = LinRange(0.0,2.0*pi,nx+1)
     y = LinRange(0.0,2.0*pi,ny+1)
     
-    w = 2.0*nq*cos.(nq*x)*cos.(nq*y)'
+    w = @. 2.0*nq*cos(nq*x)*cos(nq*y)'
     
     return w
 end
@@ -109,11 +109,11 @@ function vm_ic(nx,ny)
     yc2 = pi
     
     x = LinRange(0.0,2.0*pi,nx+1)
-    y = LinRange(0.0,2.0*pi,ny+1)'
+    y = LinRange(0.0,2.0*pi,ny+1)
     
     # x, y = np.meshgrid(x, y, indexing='ij')
     
-    w = exp.(-sigma*((x.-xc1).^2 .+ (y.-yc1).^2)) + exp.(-sigma*((x.-xc2).^2 .+ (y.-yc2).^2))
+    w = @. exp(-sigma*((x-xc1)^2 + (y'-yc1)^2)) + exp(-sigma*((x-xc2)^2 + (y'-yc2)^2))
 
     return w
 end
@@ -139,7 +139,7 @@ function pbc(nx,ny,u)
 end
 #%%
 # set initial condition for decay of turbulence problem
-function decay_ic(nx,ny,dx,dy)
+function decay_ic(nx,ny,dx,dy,iP)
     
     
     # assign initial condition for vorticity for DHIT problem
@@ -148,6 +148,7 @@ function decay_ic(nx,ny,dx,dy)
     # ------
     # nx,ny : number of grid points in x and y direction
     # dx,dy : grid spacing in x and y direction
+    # iP : IFFT matrix
     
     # Output
     # ------
@@ -200,11 +201,11 @@ function decay_ic(nx,ny,dx,dy)
     k0 = 10.0
     c = 4.0/(3.0*sqrt(pi)*(k0^5))           
     
-    kk = sqrt.((kx.^2)' .+ ky.^2)
-    es = c*(kk.^4).*exp.(-(kk/k0).^2)
-    wf = sqrt((kk.*es/pi)) .* phase*(nx*ny)
+    kk = @. sqrt((kx^2)' + ky^2)
+    es = @. c*(kk^4)*exp(-(kk/k0)^2)
+    wf = @. sqrt((kk*es/pi)) * phase*(nx*ny)
             
-    ut = real(ifft(wf)) 
+    ut = real(iP*wf) 
     
     #periodicity
     w[1:end-1,1:end-1] = ut
@@ -215,7 +216,7 @@ function decay_ic(nx,ny,dx,dy)
     return w
 end
 #%%
-function wave2phy(nx,ny,uf)
+function wave2phy(nx,ny,uf,iP)
     
     
     # Converts the field form frequency domain to the physical space.
@@ -224,6 +225,8 @@ function wave2phy(nx,ny,uf)
     # ------
     # nx,ny : number of grid points in x and y direction
     # uf : solution field in frequency domain (excluding periodic boundaries)
+    # P : FFT matrix
+    
     
     # Output
     # ------
@@ -232,7 +235,7 @@ function wave2phy(nx,ny,uf)
     
     u = Array{Float64}(undef,nx+1,ny+1)
 
-    u[1:nx-1,1:ny-1] = real(ifft(uf))
+    u[1:nx,1:ny] = real(iP*uf)
     # periodic BC
     u[:,end] = u[:,1]
     u[end,:] = u[1,:]
@@ -241,7 +244,7 @@ function wave2phy(nx,ny,uf)
 end
 #%%
 # compute the energy spectrum numerically
-function energy_spectrum(nx,ny,w)
+function energy_spectrum(nx,ny,w,P)
     
     
     # Computation of energy spectrum and maximum wavenumber from vorticity field
@@ -250,6 +253,7 @@ function energy_spectrum(nx,ny,w)
     # ------
     # nx,ny : number of grid points in x and y direction
     # w : vorticity field in physical spce (including periodic boundaries)
+    # P : FFT matrix
     
     # Output
     # ------
@@ -272,12 +276,12 @@ function energy_spectrum(nx,ny,w)
 
     # kx, ky = np.meshgrid(kx, ky, indexing='ij')
     
-    wf = fft(w[1:end-1,1:end-1]) 
+    wf = P*w[1:end-1,1:end-1]
     
     es = Array{Float64}(undef,nx,ny)
     
-    kk = sqrt.((kx.^2)' .+ ky.^2)
-    es = pi*((abs.(wf)/(nx*ny)).^2)./kk
+    kk = @. sqrt((kx^2)' + ky^2)
+    es = @. pi*((abs(wf)/(nx*ny))^2)/kk
     # es = c*(kk.^4).*exp.(-(kk/k0).^2)
     n = Int(round(sqrt(nx^2 + ny^2)/2.0))-1
     
@@ -286,7 +290,7 @@ function energy_spectrum(nx,ny,w)
     for k in 1:n
         en[k+1] = 0.0
         ic = 0
-        ind = (kk[2:end,2:end].>(k-0.5)) .& (kk[2:end,2:end].<(k+0.5))
+        ind = @. (kk[2:end,2:end]>(k-0.5)) & (kk[2:end,2:end]<(k+0.5))
         ic = length(kk[2:end,2:end][ind])
         enind[2:end,2:end] = ind
         en[k+1] = sum(es[enind])/ic
@@ -295,7 +299,7 @@ function energy_spectrum(nx,ny,w)
 end
 #%%
 # fast poisson solver using second-order central difference scheme
-function fps(nx,ny,dx,dy,k2,f)
+function fps(nx,ny,dx,dy,k2,f,iP)
     
     
     # FFT based fast poisson solver 
@@ -306,6 +310,7 @@ function fps(nx,ny,dx,dy,k2,f)
     # dx,dy : grid spacing in x and y direction
     # k2 : absolute wavenumber over 2D domain
     # f : right hand side of poisson equation in frequency domain (excluding periodic boundaries)
+    # iP : IFFT matrix
     
     # Output
     # ------
@@ -315,10 +320,10 @@ function fps(nx,ny,dx,dy,k2,f)
     u = zeros(nx+1,ny+1)
        
     # the denominator is based on the scheme used for discrtetizing the Poisson equation
-    data1 = f./(-k2)
+    soln = f./(-k2)
     
     # compute the inverse fourier transform
-    u[1:nx,1:ny] = real(ifft(data1))
+    u[1:nx,1:ny] = real(iP*soln)
     pbc(nx,ny,u)
     
     return u
@@ -354,7 +359,7 @@ function coarsen(nx,ny,nxc,nyc,uf)
 end
        
 #%%
-function nonlineardealiased(nx,ny,kx,ky,k2,wf)   
+function nonlineardealiased(nx,ny,kx,ky,k2,wf,iP,rP)   
     
     
     # compute the Jacobian with 3/2 dealiasing 
@@ -365,6 +370,8 @@ function nonlineardealiased(nx,ny,kx,ky,k2,wf)
     # kx,ky : wavenumber in x and y direction
     # k2 : absolute wave number over 2D domain
     # wf : vorticity field in frequency domain (excluding periodic boundaries)
+    # iP : IFFT matrix
+    # rP2 : FFT matrix with real coeffs
     
     # Output
     # ------
@@ -372,14 +379,14 @@ function nonlineardealiased(nx,ny,kx,ky,k2,wf)
     #      (d(psi)/dy*d(omega)/dx - d(psi)/dx*d(omega)/dy)
     
     
-    j1f = -1.0im*kx.*wf./k2
-    j2f = 1.0im*ky.*wf
-    j3f = -1.0im*ky.*wf./k2
-    j4f = 1.0im*kx.*wf
+    j1f = @. -1.0im*kx*wf/k2
+    j2f = @. 1.0im*ky*wf
+    j3f = @. -1.0im*ky*wf/k2
+    j4f = @. 1.0im*kx*wf
     
     nxe = Int(nx*2)
     nye = Int(ny*2)
-    
+
     j1f_padded = zeros(Complex{Float64},nxe,nye)
     j2f_padded = zeros(Complex{Float64},nxe,nye)
     j3f_padded = zeros(Complex{Float64},nxe,nye)
@@ -391,17 +398,17 @@ function nonlineardealiased(nx,ny,kx,ky,k2,wf)
     j1f_padded[Int(nxe-nx/2)+1:end,Int(nye-ny/2)+1:end]     = j1f[Int(nx/2)+1:end,Int(ny/2)+1:end] 
     
     j2f_padded[1:Int(nx/2),1:Int(ny/2)]                     = j2f[1:Int(nx/2),1:Int(ny/2)]
-    j2f_padded[Int(nxe-nx/2)+1:endend,1:Int(ny/2)]          = j2f[Int(nx/2)+1:end,1:Int(ny/2)]    
+    j2f_padded[Int(nxe-nx/2)+1:end,1:Int(ny/2)]             = j2f[Int(nx/2)+1:end,1:Int(ny/2)]    
     j2f_padded[1:Int(nx/2),Int(nye-ny/2)+1:end]             = j2f[1:Int(nx/2),Int(ny/2)+1:end]    
     j2f_padded[Int(nxe-nx/2)+1:end,Int(nye-ny/2)+1:end]     = j2f[Int(nx/2)+1:end,Int(ny/2)+1:end] 
     
     j3f_padded[1:Int(nx/2),1:Int(ny/2)]                     = j3f[1:Int(nx/2),1:Int(ny/2)]
-    j3f_padded[Int(nxe-nx/2)+1:endend,1:Int(ny/2)]          = j3f[Int(nx/2)+1:end,1:Int(ny/2)]    
+    j3f_padded[Int(nxe-nx/2)+1:end,1:Int(ny/2)]             = j3f[Int(nx/2)+1:end,1:Int(ny/2)]    
     j3f_padded[1:Int(nx/2),Int(nye-ny/2)+1:end]             = j3f[1:Int(nx/2),Int(ny/2)+1:end]    
     j3f_padded[Int(nxe-nx/2)+1:end,Int(nye-ny/2)+1:end]     = j3f[Int(nx/2)+1:end,Int(ny/2)+1:end] 
     
     j4f_padded[1:Int(nx/2),1:Int(ny/2)]                     = j4f[1:Int(nx/2),1:Int(ny/2)]
-    j4f_padded[Int(nxe-nx/2)+1:endend,1:Int(ny/2)]          = j4f[Int(nx/2)+1:end,1:Int(ny/2)]    
+    j4f_padded[Int(nxe-nx/2)+1:end,1:Int(ny/2)]             = j4f[Int(nx/2)+1:end,1:Int(ny/2)]    
     j4f_padded[1:Int(nx/2),Int(nye-ny/2)+1:end]             = j4f[1:Int(nx/2),Int(ny/2)+1:end]    
     j4f_padded[Int(nxe-nx/2)+1:end,Int(nye-ny/2)+1:end]     = j4f[Int(nx/2)+1:end,Int(ny/2)+1:end] 
     
@@ -410,28 +417,29 @@ function nonlineardealiased(nx,ny,kx,ky,k2,wf)
     j3f_padded = j3f_padded*(nxe*nye)/(nx*ny)
     j4f_padded = j4f_padded*(nxe*nye)/(nx*ny)
     
-    j1 = real(ifft(j1f_padded))
-    j2 = real(ifft(j2f_padded))
-    j3 = real(ifft(j3f_padded))
-    j4 = real(ifft(j4f_padded))
+    j1 = real(iP*j1f_padded)
+    j2 = real(iP*j2f_padded)
+    j3 = real(iP*j3f_padded)
+    j4 = real(iP*j4f_padded)
     
-    jacp = j1.*j2 - j3.*j4
-    
-    jacpf = fft(jacp)
+    jacp = @. j1*j2 - j3*j4
+
+    jacpf = rP*jacp
+
     
     jf = zeros(Complex{Float64},nx,ny)
     
     jf[1:Int(nx/2),1:Int(ny/2)]             = jacpf[1:Int(nx/2),1:Int(ny/2)]
-    jf[Int(nx/2)+1:end,1:Int(ny/2)]         = jacpf[Int(nxe-nx/2)+1:end,1:Int(ny/2)]    
-    jf[1:Int(nx/2),Int(ny/2)+1:end]         = jacpf[1:Int(nx/2),Int(nye-ny/2):end]    
-    jf[Int(nx/2)+1:end,Int(ny/2)+1:end]     = jacpf[Int(nxe-nx/2)+1:end,Int(nye-ny/2):end]
+    jf[Int(nx/2)+1:end,1:Int(ny/2)]         = conj.(jacpf[Int(nx/2)+1:-1:2,[1;end:-1:end-Int(nx/2)+2]])    
+    jf[1:Int(nx/2),Int(ny/2)+1:end]         = jacpf[1:Int(nx/2),Int(nye-ny/2)+1:end]    
+    jf[Int(nx/2)+1:end,Int(ny/2)+1:end]     = conj.(jacpf[Int(nx/2)+1:-1:2,Int(nx/2)+1:-1:2])
     
     jf = jf*(nx*ny)/(nxe*nye)
     
     return jf
 end
 #%%
-function nonlinear(nx,ny,kx,ky,k2,wf) 
+function nonlinear(nx,ny,kx,ky,k2,wf,iP,P) 
     
     
     # compute the Jacobian without dealiasing 
@@ -442,6 +450,8 @@ function nonlinear(nx,ny,kx,ky,k2,wf)
     # kx,ky : wavenumber in x and y direction
     # k2 : absolute wave number over 2D domain
     # wf : vorticity field in frequency domain (excluding periodic boundaries)
+    # iP : IFFT matrix
+    # P : FFT matrix
     
     # Output
     # ------
@@ -449,19 +459,19 @@ function nonlinear(nx,ny,kx,ky,k2,wf)
     #      (d(psi)/dy*d(omega)/dx - d(psi)/dx*d(omega)/dy)
     
     
-    j1f = 1.0im*kx.*wf./k2
-    j2f = 1.0im*ky.*wf
-    j3f = 1.0im*ky.*wf./k2
-    j4f = 1.0im*kx.*wf
+    j1f = @. -1.0im*kx*wf/k2
+    j2f = @. 1.0im*ky*wf
+    j3f = @. -1.0im*ky*wf/k2
+    j4f = @. 1.0im*kx*wf
     
-    j1 = real(ifft(j1f))
-    j2 = real(ifft(j2f))
-    j3 = real(ifft(j3f))
-    j4 = real(ifft(j4f))
+    j1 = real(iP*j1f)
+    j2 = real(iP*j2f)
+    j3 = real(iP*j3f)
+    j4 = real(iP*j4f)
     
-    jac = j1.*j2 - j3.*j4
+    jac = @. j1*j2 - j3*j4
     
-    jf = fft(jac)
+    jf = P*jac
     
     return jf
 end
@@ -493,27 +503,27 @@ function write_data(nx,ny,dx,dy,kx,ky,k2,nxc,nyc,dxc,dyc,wf,w0,n,freq,dt)
     # s : streamfunction in physical space for fine grid (including periodic boundaries) 
     
     
-    s = fps(nx,ny,dx,dy,k2,-wf)
-    w = wave2phy(nx,ny,wf)
+    s = fps(nx,ny,dx,dy,k2,-wf,iP)
+    w = wave2phy(nx,ny,wf,P)
    
     kxc = fftfreq(nxc,nxc)
     kyc = fftfreq(nyc,nyc)
     kxc = reshape(kxc,(nxc,1))
     kyc = reshape(kyc,(1,nyc))
     
-    k2c = kxc.^2 + kyc.^2
+    k2c = @. kxc^2 + kyc^2
     k2c[1,1] = 1.0e-12
      
-    jf = nonlineardealiased(nx,ny,kx,ky,k2,wf)
-    j = wave2phy(nx,ny,jf) # jacobian for fine solution field
+    jf = nonlineardealiased(nx,ny,kx,ky,k2,wf,iP2,rP2)
+    j = wave2phy(nx,ny,jf,iP) # jacobian for fine solution field
 
     jc = zeros(nxc+1,nyc+1) # coarsened(jacobian field)
     jfc = coarsen(nx,ny,nxc,nyc,jf) # coarsened(jacobian field) in frequency domain
-    jc = wave2phy(nxc,nyc,jfc) # coarsened(jacobian field) physical space
+    jc = wave2phy(nxc,nyc,jf,iPc) # coarsened(jacobian field) physical space
        
     wfc = coarsen(nx,ny,nxc,nyc,wf)       
-    jcoarsef = nonlineardealiased(nxc,nyc,kxc,kyc,k2c,wfc) # jacobian(coarsened solution field) in frequency domain
-    jcoarse = wave2phy(nxc,nyc,jcoarsef) # jacobian(coarsened solution field) physical space
+    jcoarsef = nonlineardealiased(nxc,nyc,kxc,kyc,k2c,wfc,iP,rP) # jacobian(coarsened solution field) in frequency domain
+    jcoarse = wave2phy(nxc,nyc,jcoarsef,iPc) # jacobian(coarsened solution field) physical space
     
     sgs = jc - jcoarse
     
@@ -539,9 +549,23 @@ function write_data(nx,ny,dx,dy,kx,ky,k2,nxc,nyc,dxc,dyc,wf,w0,n,freq,dt)
     
     if mod(n,50*freq) == 0
 
-        c1 = plot(LinRange(0,2pi,nx),LinRange(0,2pi,ny),w0',linetype=:contourf,clim=(0,1),color=:jet)
-        c1 = plot(LinRange(0,2pi,nx),LinRange(0,2pi,ny),w',linetype=:contourf,clim=(0,1),color=:jet)
+        c1 = plot(LinRange(0,2pi,nx),LinRange(0,2pi,ny),w0',
+                    linetype=:contourf,
+                    xlabel = "x",
+                    ylabel = "y",
+                    title = "t = 0.0",
+                    clim=(minimum(w0),maximum(w0)),
+                    color=:jet)
+        c2 = plot(LinRange(0,2pi,nx),LinRange(0,2pi,ny),w',
+                    linetype=:contourf,
+                    xlabel = "x",
+                    ylabel = "y",
+                    title = "t = $(n*dt)",
+                    clim=(minimum(w0),maximum(w0)),
+                    color=:jet)
         filename = "spectral/"*folder*"/field_spectral_"*string(Int(round(n/freq)))*".png"
+        plot(c1,c2)
+        png(filename)
     end
     # if n%(50*freq) == 0
     #     fig, axs = plt.subplots(1,2,sharey=True,figsize=(9,5))
@@ -604,8 +628,18 @@ dxc = lx/Float64(nxc)
 dyc = ly/Float64(nyc)
 
 ifile = 0
-timeprod = ichkp*freq*istart*dt
+tchkp = ichkp*freq*istart*dt
 folder = "data_"*string(nx)
+
+P    = plan_fft(rand(nx,ny))
+Pc   = plan_fft(rand(nxc,nyc))
+P2   = plan_fft(rand(2*nx,2*ny))
+iP   = plan_ifft(rand(nx,ny))
+iPc  = plan_ifft(rand(nxc,nyc))
+iP2  = plan_ifft(rand(2*nx,2*ny))
+rP   = plan_rfft(rand(nx,ny))
+rPc  = plan_rfft(rand(nxc,nyc))
+rP2  = plan_rfft(rand(2*nx,2*ny))
 
 #%%
 # set the initial condition based on the problem selected
@@ -614,7 +648,7 @@ if (ipr == 1)
 elseif (ipr == 2)
     w0 = vm_ic(nx,ny) # vortex-merger problem
 elseif (ipr == 3)
-    w0 = decay_ic(nx,ny,dx,dy) # decaying homegeneous isotropic turbulence problem
+    w0 = decay_ic(nx,ny,dx,dy,iP) # decaying homegeneous isotropic turbulence problem
 end
 #%%  
 if ichkp == 0
@@ -632,9 +666,9 @@ ky = fftfreq(ny,ny)
 kx = reshape(kx,(nx,1))
 ky = reshape(ky,(1,ny))
 
-data = complex.(w,0.0)
+data = complex.(w[1:end-1,1:end-1],0.0)
 
-wnf = fft(data) # fourier space forward
+wnf = P*data # fourier space forward
 
 #%%
 # initialize variables for time integration
@@ -642,7 +676,7 @@ a1, a2, a3 = 8.0/15.0, 2.0/15.0, 1.0/3.0
 g1, g2, g3 = 8.0/15.0, 5.0/12.0, 3.0/4.0
 r2, r3 = -17.0/60.0, -5.0/12.0
 
-k2 = kx.^2 .+ ky.^2
+k2 = @. kx^2 + ky^2
 k2[1,1] = 1.0e-12
 
 z = 0.5*dt*k2/re
@@ -657,29 +691,34 @@ w2f = Array{Complex{Float64}}(undef,nx,ny)
 clock_time_init = time()
 # time integration using hybrid third-order Runge-Kutta implicit Crank-Nicolson scheme
 # refer to Orlandi: Fluid flow phenomenon
+
 for n in Int(ichkp*istart*freq)+1:nt
-    timeprod = timeprod + dt
+    looptime = time()
+    t = n*dt
     # 1st step
-    jnf = nonlineardealiased(nx,ny,kx,ky,k2,wnf)    
-    w1f[:,:] = ((1.0 - d1)/(1.0 + d1))*wnf + (g1*dt*jnf)/(1.0 + d1)
-    w1f[1.1] = 0.0
-    
+    jnf = nonlineardealiased(nx,ny,kx,ky,k2,wnf,iP2,rP2)    
+    w1f[:,:] = @. ((1.0 - d1)/(1.0 + d1))*wnf + (g1*dt*jnf)/(1.0 + d1)
+    w1f[1,1] = 0.0
+    a = time() - looptime
+
     # 2nd step
-    j1f = nonlineardealiased(nx,ny,kx,ky,k2,w1f)
-    w2f = ((1.0 - d2)/(1.0 + d2))*w1f + (r2*dt*jnf+ g2*dt*j1f)/(1.0 + d2)
-    w2f[1.1] = 0.0
-    
+    j1f = nonlineardealiased(nx,ny,kx,ky,k2,w1f,iP2,rP2)
+    w2f[:,:] = @. ((1.0 - d2)/(1.0 + d2))*w1f + (r2*dt*jnf + g2*dt*j1f)/(1.0 + d2)
+    w2f[1,1] = 0.0
+    b = time() - looptime - a
+
     # 3rd step
-    j2f = nonlineardealiased(nx,ny,kx,ky,k2,w2f)
-    wnf = ((1.0 - d3)/(1.0 + d3))*w2f + (r3*dt*j1f + g3*dt*j2f)/(1.0 + d3)
-    wnf[1.1] = 0.0
-    
-    if (n%freq == 0)
+    j2f = nonlineardealiased(nx,ny,kx,ky,k2,w2f,iP2,rP2)
+    wnf[:,:] = @. ((1.0 - d3)/(1.0 + d3))*w2f + (r3*dt*j1f + g3*dt*j2f)/(1.0 + d3)
+    wnf[1,1] = 0.0
+    c = time() - looptime - b
+    println((a+b+c)/3)
+    if (mod(n,freq) == 0)
         write_data(nx,ny,dx,dy,kx,ky,k2,nxc,nyc,dxc,dyc,wnf,w0,n,freq,dt)
-        print(n, " ", timeprod, " ",wnf.shape[0], " ", wnf.shape[1])
+        println("n: $n, t = $(t+tchkp) $(size(wnf)[1])x$(size(wnf)[2])")
     end
 end
-w = wave2phy(nx,ny,wnf) # final vorticity field in physical space            
+w = wave2phy(nx,ny,wnf,P) # final vorticity field in physical space            
 
 total_clock_time = time() - clock_time_init
 print("Total clock time=", total_clock_time)  
@@ -687,8 +726,8 @@ print("Total clock time=", total_clock_time)
 #%%
 # compute the exact, initial and final energy spectrum for DHIT problem
 if (ipr == 3)
-    en, n = energy_spectrum(nx,ny,w)
-    en0, n = energy_spectrum(nx,ny,w0)
+    en, n = energy_spectrum(nx,ny,w,P)
+    en0, n = energy_spectrum(nx,ny,w0,P)
     k = LinRange(1,n,n)
     
     k0 = 10.0
@@ -774,22 +813,22 @@ if (ipr == 3)
     savefig("es_spectral.png")    
 
 end
-#%%
-fig = plt.figure(figsize=(10,6))
-ax = fig.gca(projection='3d', proj_type = 'ortho')
+# #%%
+# fig = plt.figure(figsize=(10,6))
+# ax = fig.gca(projection='3d', proj_type = 'ortho')
 
-X, Y = np.mgrid[0:2.0*pi+dx:dx, 0:2.0*pi+dy:dy]
+# X, Y = np.mgrid[0:2.0*pi+dx:dx, 0:2.0*pi+dy:dy]
 
-surf = ax.plot_surface(X, Y, w, cmap='coolwarm',vmin=-30, vmax=30,
-                       linewidth=0, antialiased=False,rstride=1,
-                        cstride=1)
+# surf = ax.plot_surface(X, Y, w, cmap='coolwarm',vmin=-30, vmax=30,
+#                        linewidth=0, antialiased=False,rstride=1,
+#                         cstride=1)
 
-fig.colorbar(surf, shrink=0.5, aspect=5)
-ax.view_init(elev=60, azim=30)
-plt.show()
+# fig.colorbar(surf, shrink=0.5, aspect=5)
+# ax.view_init(elev=60, azim=30)
+# plt.show()
 
-#%%
-savefig("vorticity_3D1.png", dpi=30)
+# #%%
+# savefig("vorticity_3D1.png", dpi=30)
 
 
 
