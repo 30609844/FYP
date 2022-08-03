@@ -11,8 +11,9 @@
 # hybrid third-order Runge-Kutta implicit Crank-Nicolson scheme for time integration. 
 
 ##
+println(string(Threads.nthreads())*" THREADS")
 using FFTW
-FFTW.set_num_threads(6)
+FFTW.set_num_threads(Threads.nthreads())
 using Plots, DelimitedFiles
 # import numpy as np
 # from numpy.random import seed
@@ -504,7 +505,7 @@ function write_data(nx,ny,dx,dy,kx,ky,k2,nxc,nyc,dxc,dyc,wf,w0,n,freq,dt)
     
     
     s = fps(nx,ny,dx,dy,k2,-wf,iP)
-    w = wave2phy(nx,ny,wf,P)
+    w = wave2phy(nx,ny,wf,iP)
    
     kxc = fftfreq(nxc,nxc)
     kyc = fftfreq(nyc,nyc)
@@ -519,10 +520,10 @@ function write_data(nx,ny,dx,dy,kx,ky,k2,nxc,nyc,dxc,dyc,wf,w0,n,freq,dt)
 
     jc = zeros(nxc+1,nyc+1) # coarsened(jacobian field)
     jfc = coarsen(nx,ny,nxc,nyc,jf) # coarsened(jacobian field) in frequency domain
-    jc = wave2phy(nxc,nyc,jf,iPc) # coarsened(jacobian field) physical space
+    jc = wave2phy(nxc,nyc,jfc,iPc) # coarsened(jacobian field) physical space
        
     wfc = coarsen(nx,ny,nxc,nyc,wf)       
-    jcoarsef = nonlineardealiased(nxc,nyc,kxc,kyc,k2c,wfc,iP,rP) # jacobian(coarsened solution field) in frequency domain
+    jcoarsef = nonlineardealiased(nxc,nyc,kxc,kyc,k2c,wfc,iP2c,rP2c) # jacobian(coarsened solution field) in frequency domain
     jcoarse = wave2phy(nxc,nyc,jcoarsef,iPc) # jacobian(coarsened solution field) physical space
     
     sgs = jc - jcoarse
@@ -549,22 +550,22 @@ function write_data(nx,ny,dx,dy,kx,ky,k2,nxc,nyc,dxc,dyc,wf,w0,n,freq,dt)
     
     if mod(n,50*freq) == 0
 
-        c1 = plot(LinRange(0,2pi,nx),LinRange(0,2pi,ny),w0',
-                    linetype=:contourf,
+        c1 = heatmap(LinRange(0,2pi,nx+1),LinRange(0,2pi,ny+1),w0',
                     xlabel = "x",
                     ylabel = "y",
                     title = "t = 0.0",
                     clim=(minimum(w0),maximum(w0)),
+                    colorbar=true,
                     color=:jet)
-        c2 = plot(LinRange(0,2pi,nx),LinRange(0,2pi,ny),w',
-                    linetype=:contourf,
+        c2 = heatmap(LinRange(0,2pi,nx+1),LinRange(0,2pi,ny+1),w',
                     xlabel = "x",
                     ylabel = "y",
                     title = "t = $(n*dt)",
                     clim=(minimum(w0),maximum(w0)),
+                    colorbar=true,
                     color=:jet)
         filename = "spectral/"*folder*"/field_spectral_"*string(Int(round(n/freq)))*".png"
-        plot(c1,c2)
+        plot(c1,c2,)
         png(filename)
     end
     # if n%(50*freq) == 0
@@ -634,12 +635,15 @@ folder = "data_"*string(nx)
 P    = plan_fft(rand(nx,ny))
 Pc   = plan_fft(rand(nxc,nyc))
 P2   = plan_fft(rand(2*nx,2*ny))
+P2c  = plan_fft(rand(2*nxc,2*nyc))
 iP   = plan_ifft(rand(nx,ny))
 iPc  = plan_ifft(rand(nxc,nyc))
 iP2  = plan_ifft(rand(2*nx,2*ny))
+iP2c = plan_ifft(rand(2*nxc,2*nyc))
 rP   = plan_rfft(rand(nx,ny))
 rPc  = plan_rfft(rand(nxc,nyc))
 rP2  = plan_rfft(rand(2*nx,2*ny))
+rP2c = plan_rfft(rand(2*nxc,2*nyc))
 
 #%%
 # set the initial condition based on the problem selected
@@ -684,6 +688,10 @@ d1 = a1*z
 d2 = a2*z
 d3 = a3*z
 
+jnf = Array{Complex{Float64}}(undef,nx,ny)
+j1f = Array{Complex{Float64}}(undef,nx,ny)
+j2f = Array{Complex{Float64}}(undef,nx,ny)
+
 w1f = Array{Complex{Float64}}(undef,nx,ny)
 w2f = Array{Complex{Float64}}(undef,nx,ny)
 
@@ -696,23 +704,23 @@ for n in Int(ichkp*istart*freq)+1:nt
     looptime = time()
     t = n*dt
     # 1st step
-    jnf = nonlineardealiased(nx,ny,kx,ky,k2,wnf,iP2,rP2)    
+    jnf[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,wnf,iP2,rP2)    
     w1f[:,:] = @. ((1.0 - d1)/(1.0 + d1))*wnf + (g1*dt*jnf)/(1.0 + d1)
     w1f[1,1] = 0.0
     a = time() - looptime
 
     # 2nd step
-    j1f = nonlineardealiased(nx,ny,kx,ky,k2,w1f,iP2,rP2)
+    j1f[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,w1f,iP2,rP2)
     w2f[:,:] = @. ((1.0 - d2)/(1.0 + d2))*w1f + (r2*dt*jnf + g2*dt*j1f)/(1.0 + d2)
     w2f[1,1] = 0.0
     b = time() - looptime - a
 
     # 3rd step
-    j2f = nonlineardealiased(nx,ny,kx,ky,k2,w2f,iP2,rP2)
+    j2f[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,w2f,iP2,rP2)
     wnf[:,:] = @. ((1.0 - d3)/(1.0 + d3))*w2f + (r3*dt*j1f + g3*dt*j2f)/(1.0 + d3)
     wnf[1,1] = 0.0
     c = time() - looptime - b
-    println((a+b+c)/3)
+    println("Avg. "*string(round((a+b+c)/3; digits=5))*"s per RK3 step")
     if (mod(n,freq) == 0)
         write_data(nx,ny,dx,dy,kx,ky,k2,nxc,nyc,dxc,dyc,wnf,w0,n,freq,dt)
         println("n: $n, t = $(t+tchkp) $(size(wnf)[1])x$(size(wnf)[2])")
