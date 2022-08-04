@@ -565,7 +565,7 @@ function write_data(nx,ny,dx,dy,kx,ky,k2,nxc,nyc,dxc,dyc,wf,w0,n,freq,dt)
                     colorbar=true,
                     color=:jet)
         filename = "spectral/"*folder*"/field_spectral_"*string(Int(round(n/freq)))*".png"
-        plot(c1,c2,)
+        plot(c1,c2)
         png(filename)
     end
     # if n%(50*freq) == 0
@@ -630,7 +630,7 @@ dyc = ly/Float64(nyc)
 
 ifile = 0
 tchkp = ichkp*freq*istart*dt
-folder = "data_"*string(nx)
+folder = "data_"*string(nx)*"_v2"
 
 P    = plan_fft(rand(nx,ny))
 Pc   = plan_fft(rand(nxc,nyc))
@@ -659,8 +659,8 @@ if ichkp == 0
     w = w0
 elseif ichkp == 1
     print(istart)
-    file_input = "spectral/"*folder*"/04_vorticity/w_"*string(istart)+".csv"
-    w = readdlm(file_input, delimiter=',')
+    file_input = "spectral/"*folder*"/04_vorticity/w_"*string(istart)*".csv"
+    w = readdlm(file_input, ',', Float64)
 end
 #%%
 # compute frequencies, vorticity field in frequency domain
@@ -707,23 +707,33 @@ for n in Int(ichkp*istart*freq)+1:nt
     jnf[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,wnf,iP2,rP2)    
     w1f[:,:] = @. ((1.0 - d1)/(1.0 + d1))*wnf + (g1*dt*jnf)/(1.0 + d1)
     w1f[1,1] = 0.0
-    a = time() - looptime
 
     # 2nd step
     j1f[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,w1f,iP2,rP2)
     w2f[:,:] = @. ((1.0 - d2)/(1.0 + d2))*w1f + (r2*dt*jnf + g2*dt*j1f)/(1.0 + d2)
     w2f[1,1] = 0.0
-    b = time() - looptime - a
 
     # 3rd step
     j2f[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,w2f,iP2,rP2)
     wnf[:,:] = @. ((1.0 - d3)/(1.0 + d3))*w2f + (r3*dt*j1f + g3*dt*j2f)/(1.0 + d3)
     wnf[1,1] = 0.0
-    c = time() - looptime - b
-    println("Avg. "*string(round((a+b+c)/3; digits=5))*"s per RK3 step")
+    a = time() - looptime
+    println("Avg. "*string(round(a/3; digits=5))*"s per RK3 step")
+    if any(isnan.(wnf))
+        println("WARNING: NaN encountered")
+        println("Code will exit")
+        file_input = "spectral/"*folder*"/04_vorticity/w_"*string(Int(round(n/freq-1)))*".csv"
+        wback = readdlm(file_input, ',', Float64) 
+        wnf[:,:] = P*(complex.(wback[1:end-1,1:end-1],0.0))
+        break
+        # println("SOLVER WILL BACKTRACK TO PREVIOUS SOLUTION")
+        # file_input = "spectral/"*folder*"/04_vorticity/w_"*string(Int(round(n/freq-5)))*".csv"
+        # wback = readdlm(file_input, ',', Float64) 
+        # wnf = P*(complex.(wback[1:end-1,1:end-1],0.0))
+    end
     if (mod(n,freq) == 0)
         write_data(nx,ny,dx,dy,kx,ky,k2,nxc,nyc,dxc,dyc,wnf,w0,n,freq,dt)
-        println("n: $n, t = $(t+tchkp) $(size(wnf)[1])x$(size(wnf)[2])")
+        println("n: $n, t = $(round(t+tchkp; digits=4)) $(size(wnf)[1])x$(size(wnf)[2])")
     end
 end
 w = wave2phy(nx,ny,wnf,P) # final vorticity field in physical space            
@@ -739,8 +749,8 @@ if (ipr == 3)
     k = LinRange(1,n,n)
     
     k0 = 10.0
-    c = 4.0/(3.0*sqrt(pi)*(k0^5))           
-    ese = c*(k^4)*exp(-(k/k0)^2)
+    c = @. 4.0/(3.0*sqrt(pi)*(k0^5))           
+    ese = @. c*(k^4)*exp(-(k/k0)^2)
     
     writelm("spectral/energy_spectral_"*string(nd)*"_"*string(Int(re))*".csv", en, ',')
 end
@@ -795,28 +805,29 @@ if (ipr == 3)
         ylabel = "E(k)",
         ylims = (1e-16,1e-0),
         label="Exact",
+        title = "TKE spectrum",
         legend = :bottomleft)
-    p1 = plot!(k,en0[2:end]
+    p1 = plot!(k,en0[2:end],
         lw=2,
         ls = :dash,
         linecolor = :red,
         xscale = :log,
         yscale = :log,
         label="t = 0.0")
-    p1 = plot!(k,en[2:end]
+    p1 = plot!(k,en[2:end],
         lw=2,
         ls = :dash,
         linecolor = :blue,
         xscale = :log,
         yscale = :log,
         label="t = 0.0"*string(dt*nt))
-    p1 = plot!(k,line
+    p1 = plot!(k,line,
         lw=2,
         ls = :dash,
         linecolor = :black,
         xscale = :log,
         yscale = :log,
-        label="t = 0.0"*string(dt*nt))
+        label="k^-3")
     plot(p1)
     savefig("es_spectral.png")    
 
