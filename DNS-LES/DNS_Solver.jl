@@ -15,6 +15,7 @@ println(string(Threads.nthreads())*" THREADS")
 using FFTW
 FFTW.set_num_threads(Threads.nthreads())
 using Plots, DelimitedFiles
+gr()
 
 #%%
 function exact_tgv(nx,ny,t,re)
@@ -459,20 +460,16 @@ end
 
 function w_plot(nx,ny,dt,w0,w,folder,n)
     c1 = heatmap(LinRange(0,2pi,nx+1),LinRange(0,2pi,ny+1),w0,
-        xlabel = "x",
-        ylabel = "y",
         title = "t = 0.0",
         clim=(minimum(w0),maximum(w0)),
-        colorbar=true)
+        axis = nothing)
     c2 = heatmap(LinRange(0,2pi,nx+1),LinRange(0,2pi,ny+1),w,
-        xlabel = "x",
-        ylabel = "y",
         title = "t = $(n*dt)",
         clim=(minimum(w0),maximum(w0)),
-        colorbar=true)
+        axis = nothing)
     filename = "spectral/"*folder*"/field_spectral_"*string(n)*".png"
-    plot(c1,c2)
-    png(filename)
+    plot(c1,c2,size = (1400,600))
+    savefig(filename)
 end
 
 #%% coarsening
