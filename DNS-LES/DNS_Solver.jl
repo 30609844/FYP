@@ -591,9 +591,9 @@ function main()
     j = zeros(nx+1,ny+1)    
     w = zeros(nx+1,ny+1)    #lol
 
-    jfc         = zeros(nxc,nyc)
-    jcoarsef    = zeros(nxc,nyc)
-    wfc         = zeros(nxc,nyc)
+    jfc         = zeros(Complex{Float64},nxc,nyc)
+    jcoarsef    = zeros(Complex{Float64},nxc,nyc)
+    wfc         = zeros(Complex{Float64},nxc,nyc)
 
     jc      = zeros(nxc+1,nyc+1)
     jcoarse = zeros(nxc+1,nyc+1)
