@@ -590,7 +590,13 @@ function main()
     s = zeros(nx+1,ny+1)
     j = zeros(nx+1,ny+1)    
     w = zeros(nx+1,ny+1)    #lol
-    
+
+    jfc         = zeros(nxc,nyc)
+    jcoarsef    = zeros(nxc,nyc)
+    wfc         = zeros(nxc,nyc)
+
+    jc      = zeros(nxc+1,nyc+1)
+    jcoarse = zeros(nxc+1,nyc+1)
 
     #%%
     # set the initial condition based on the problem selected
@@ -619,15 +625,15 @@ function main()
         k2c[1,1] = 1.0e-12
                  
         jnf[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,wnf,iP2,rP2)
-        j = wave2phy(nx,ny,jnf,iP) # jacobian for fine solution field
+        j[:,:] = wave2phy(nx,ny,jnf,iP) # jacobian for fine solution field
             
-        jc = zeros(nxc+1,nyc+1) # coarsened(jacobian field)
-        jfc = coarsen(nx,ny,nxc,nyc,jf) # coarsened(jacobian field) in frequency domain
-        jc = wave2phy(nxc,nyc,jfc,iPc) # coarsened(jacobian field) physical space
+         # coarsened(jacobian field)
+        jfc[:,:] = coarsen(nx,ny,nxc,nyc,jf) # coarsened(jacobian field) in frequency domain
+        jc[:,:] = wave2phy(nxc,nyc,jfc,iPc) # coarsened(jacobian field) physical space
                    
-        wfc = coarsen(nx,ny,nxc,nyc,wnf)       
-        jcoarsef = nonlineardealiased(nxc,nyc,kxc,kyc,k2c,wfc,iP2c,rP2c) # jacobian(coarsened solution field) in frequency domain
-        jcoarse = wave2phy(nxc,nyc,jcoarsef,iPc) # jacobian(coarsened solution field) physical space
+        wfc[:,:] = coarsen(nx,ny,nxc,nyc,wnf)       
+        jcoarsef[:,:] = nonlineardealiased(nxc,nyc,kxc,kyc,k2c,wfc,iP2c,rP2c) # jacobian(coarsened solution field) in frequency domain
+        jcoarse[:,:] = wave2phy(nxc,nyc,jcoarsef,iPc) # jacobian(coarsened solution field) physical space
                 
         sgs = jc - jcoarse
         write_data(jc,jcourse,sgs,w,s,0,folder)
@@ -689,27 +695,28 @@ function main()
             # wnf = P*(complex.(wback[1:end-1,1:end-1],0.0))
         end
         if (mod(n,freq) == 0)
-            s = fps(nx,ny,dx,dy,k2,-wnf,iP)
-            w = wave2phy(nx,ny,wnf,iP)
-           
+            s[:,:] = fps(nx,ny,dx,dy,k2,-wnf,iP)
+            w[:,:] = wave2phy(nx,ny,wnf,iP)
+               
             kxc = fftfreq(nxc,nxc)
             kyc = fftfreq(nyc,nyc)
             kxc = reshape(kxc,(nxc,1))
             kyc = reshape(kyc,(1,nyc))
-            
+                
             k2c = @. kxc^2 + kyc^2
             k2c[1,1] = 1.0e-12
-             
-            j = wave2phy(nx,ny,jnf,iP) # jacobian for fine solution field
-        
-            jc = zeros(nxc+1,nyc+1) # coarsened(jacobian field)
-            jfc = coarsen(nx,ny,nxc,nyc,jnf) # coarsened(jacobian field) in frequency domain
-            jc = wave2phy(nxc,nyc,jfc,iPc) # coarsened(jacobian field) physical space
-               
-            wfc = coarsen(nx,ny,nxc,nyc,wnf)       
-            jcoarsef = nonlineardealiased(nxc,nyc,kxc,kyc,k2c,wfc,iP2c,rP2c) # jacobian(coarsened solution field) in frequency domain
-            jcoarse = wave2phy(nxc,nyc,jcoarsef,iPc) # jacobian(coarsened solution field) physical space
+                 
+            jnf[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,wnf,iP2,rP2)
+            j[:,:] = wave2phy(nx,ny,jnf,iP) # jacobian for fine solution field
             
+            # coarsened(jacobian field)
+            jfc[:,:] = coarsen(nx,ny,nxc,nyc,jf) # coarsened(jacobian field) in frequency domain
+            jc[:,:] = wave2phy(nxc,nyc,jfc,iPc) # coarsened(jacobian field) physical space
+                   
+            wfc[:,:] = coarsen(nx,ny,nxc,nyc,wnf)       
+            jcoarsef[:,:] = nonlineardealiased(nxc,nyc,kxc,kyc,k2c,wfc,iP2c,rP2c) # jacobian(coarsened solution field) in frequency domain
+            jcoarse[:,:] = wave2phy(nxc,nyc,jcoarsef,iPc) # jacobian(coarsened solution field) physical space
+                
             sgs = jc - jcoarse
             write_data(jc,jcourse,sgs,w,s,n,folder)
             println("n: $n, t = $(round(t+tchkp; digits=4)) $(size(wnf)[1])x$(size(wnf)[2])")
