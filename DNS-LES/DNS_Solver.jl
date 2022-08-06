@@ -15,32 +15,12 @@ println(string(Threads.nthreads())*" THREADS")
 using FFTW
 FFTW.set_num_threads(Threads.nthreads())
 using Plots, DelimitedFiles
-# import numpy as np
-# from numpy.random import seed
-# seed(1)
-# import pyfftw
-# from scipy import integrate
-# from scipy import linalg
-# import matplotlib.pyplot as plt 
-# import time as tm
-# import matplotlib.ticker as ticker
-# import os
-
-# from mpl_toolkits.mplot3d import Axes3D
-# from matplotlib import cm
-# from matplotlib.ticker import LinearLocator, FormatStrFormatter
-# from scipy.interpolate import UnivariateSpline
-# from matplotlib.colors import LightSource
-
-# font = {'family' : 'Times New Roman',
-#         'size'   : 14}    
-# plt.rc('font', ^font)
 
 #%%
 function exact_tgv(nx,ny,t,re)
     
     
-    # compute exact solution for TGV problem
+    # compute exact solution for 2D TGV problem
     
     # Inputs
     # ------
@@ -63,10 +43,10 @@ function exact_tgv(nx,ny,t,re)
     return ue
 end
 #%%
-function tgv_ic(nx,ny)
+function tgv_2D_ic(nx,ny)
     
     
-    # compute initial condition for TGV problem
+    # compute initial condition for 2D TGV problem
     
     # Inputs
     # ------
@@ -177,7 +157,7 @@ function decay_ic(nx,ny,dx,dy,iP)
     # ksi = [2.62022653e+00 4.52593227e+00 7.18638172e-04;1.89961158e+00 9.22094457e-01 5.80180502e-01;1.17030742e+00 2.17122208e+00 2.49296356e+00]
     # eta = [3.38548539 2.63387681 4.3053611;1.28461137 5.51737457 0.17208132;4.21267161 2.6220034  3.51035172]
     phase = zeros(Complex{Float64},nx,ny)
-    wf = Array{Complex{Float64}}(undef,nx,ny)
+    wf = zeros(Complex{Float64},nx,ny)
     
     phase[2:Int(nx/2),2:Int(ny/2)]          = complex.(cos.(ksi[2:Int(nx/2),2:Int(ny/2)] +
                                             eta[2:Int(nx/2),2:Int(ny/2)]), 
@@ -478,57 +458,23 @@ function nonlinear(nx,ny,kx,ky,k2,wf,iP,P)
 end
 
 #%% coarsening
-function write_data(nx,ny,dx,dy,kx,ky,k2,nxc,nyc,dxc,dyc,wf,w0,n,freq,dt)
+function write_data(jc,jcourse,sgs,w,s,n,folder)
     
     
     # write the data to .csv files for post-processing
-    
     # Inputs
     # ------
-    # nx,ny : number of grid points in x and y direction on fine grid
-    # dx,dy : grid spacing in x and y direction
-    # kx,ky : wavenumber in x and y direction
-    # k2 : absolute wave number over 2D domain
-    # nxc,nyc : number of grid points in x and y direction on caorse grid
-    # dxc,dyc : grid spacing in x and y direction for coarse grid
-    # wf : vorticity field in frequency domain (excluding periodic boundaries)
-    # n : time step
-    # freq : frequency at which to write the data
-    
-    # Output/ write
+    # n : Iteration number 
+    # folder : Destination folder
+    # Outputs/ write
     # ------
     # jc : coarsening of Jacobian computed at fine grid
     # jcoarse : Jacobian computed for coarsed solution field
     # sgs : subgrid scale term
     # w : vorticity in physical space for fine grid (including periodic boundaries)
-    # s : streamfunction in physical space for fine grid (including periodic boundaries) 
+    # s : streamfunction in physical space for fine grid (including periodic boundaries)
     
-    
-    s = fps(nx,ny,dx,dy,k2,-wf,iP)
-    w = wave2phy(nx,ny,wf,iP)
-   
-    kxc = fftfreq(nxc,nxc)
-    kyc = fftfreq(nyc,nyc)
-    kxc = reshape(kxc,(nxc,1))
-    kyc = reshape(kyc,(1,nyc))
-    
-    k2c = @. kxc^2 + kyc^2
-    k2c[1,1] = 1.0e-12
-     
-    jf = nonlineardealiased(nx,ny,kx,ky,k2,wf,iP2,rP2)
-    j = wave2phy(nx,ny,jf,iP) # jacobian for fine solution field
 
-    jc = zeros(nxc+1,nyc+1) # coarsened(jacobian field)
-    jfc = coarsen(nx,ny,nxc,nyc,jf) # coarsened(jacobian field) in frequency domain
-    jc = wave2phy(nxc,nyc,jfc,iPc) # coarsened(jacobian field) physical space
-       
-    wfc = coarsen(nx,ny,nxc,nyc,wf)       
-    jcoarsef = nonlineardealiased(nxc,nyc,kxc,kyc,k2c,wfc,iP2c,rP2c) # jacobian(coarsened solution field) in frequency domain
-    jcoarse = wave2phy(nxc,nyc,jcoarsef,iPc) # jacobian(coarsened solution field) physical space
-    
-    sgs = jc - jcoarse
-    
-    folder = "data_"*string(nx) * "_v2"
     if !isdir("spectral//"*folder)
         mkdir("spectral/"*folder)
         mkdir("spectral/"*folder*"/01_coarsened_jacobian_field")
@@ -537,6 +483,7 @@ function write_data(nx,ny,dx,dy,kx,ky,k2,nxc,nyc,dxc,dyc,wf,w0,n,freq,dt)
         mkdir("spectral/"*folder*"/04_vorticity")
         mkdir("spectral/"*folder*"/05_streamfunction")
     end
+
     filename = "spectral/"*folder*"/01_coarsened_jacobian_field/J_fourier_"*string(Int(round(n/freq)))*".csv"  
     writedlm(filename,jc,',')
     filename = "spectral/"*folder*"/02_jacobian_coarsened_field/J_coarsen_"*string(Int(round(n/freq)))*".csv"
@@ -549,306 +496,324 @@ function write_data(nx,ny,dx,dy,kx,ky,k2,nxc,nyc,dxc,dyc,wf,w0,n,freq,dt)
     writedlm(filename,s,',')
     
     if mod(n,50*freq) == 0
-
-        c1 = heatmap(LinRange(0,2pi,nx+1),LinRange(0,2pi,ny+1),w0',
+        c1 = heatmap(LinRange(0,2pi,nx+1),LinRange(0,2pi,ny+1),w0,
                     xlabel = "x",
                     ylabel = "y",
                     title = "t = 0.0",
                     clim=(minimum(w0),maximum(w0)),
-                    colorbar=true,
-                    color=:jet)
-        c2 = heatmap(LinRange(0,2pi,nx+1),LinRange(0,2pi,ny+1),w',
+                    colorbar=true)
+        c2 = heatmap(LinRange(0,2pi,nx+1),LinRange(0,2pi,ny+1),w,
                     xlabel = "x",
                     ylabel = "y",
                     title = "t = $(n*dt)",
                     clim=(minimum(w0),maximum(w0)),
-                    colorbar=true,
-                    color=:jet)
+                    colorbar=true)
         filename = "spectral/"*folder*"/field_spectral_"*string(Int(round(n/freq)))*".png"
         plot(c1,c2)
         png(filename)
     end
-    # if n%(50*freq) == 0
-    #     fig, axs = plt.subplots(1,2,sharey=True,figsize=(9,5))
-
-    #     cs = axs[0].contourf(w0.T, 120, cmap = 'jet', interpolation='bilinear')
-    #     axs[0].text(0.4, -0.1, '$t = 0.0$', transform=axs[0].transAxes, fontsize=16, fontweight='bold', va='top')
-        
-    #     cs = axs[1].contourf(w.T, 120, cmap = 'jet', interpolation='bilinear')
-    #     axs[1].text(0.4, -0.1, '$t = '+string(dt*n)+'$', transform=axs[1].transAxes, fontsize=16, fontweight='bold', va='top')
-        
-    #     fig.tight_layout() 
-    #     fig.subplots_adjust(bottom=0.15)
-        
-    #     cbar_ax = fig.add_axes([0.22, -0.05, 0.6, 0.04])
-    #     fig.colorbar(cs, cax=cbar_ax, orientation='horizontal')
-            
-    #     filename = "spectral/"+folder+"/field_spectral_"+string(Int(n/freq))+".png"
-    #     fig.savefig(filename, bbox_inches = 'tight')
-    # end
 end
 #%% 
-# read input file
-l1 = []
-filename = "input.txt"
-open(filename,"r")
-l1 = readdlm(filename,comment_char='!')[:,1]
 
-nd = Int64(l1[1])       #NXF=NYF, resolution
-nt = Int64(l1[2])       #NT, number of time step
-re = Float64(l1[3])     #Re, Reynolds number 
-dt = Float64(l1[4])     #dt; time step
-ns = Int64(l1[5])       #nf;number of files to store
-isolver = Int64(l1[6])  #isolver:[1]ikeda, [2]arakawa
-isc = Int64(l1[7])      #isc; [0]don't write-screen, [1]write-screen
-ich = Int64(l1[8])      #ich; Check for the file
-ipr = Int64(l1[9])      #ipr; [1]TGV, [2]VM, [3]Decay 
-ndc = Int64(l1[10])     #NXC=NYC, coarse resolution
-ichkp = Int64(l1[11])   #ichkp; [0]t=0, [1]checkpoint
-istart = Int64(l1[12])  #istart; last saved file (starting point)
+function main()
+    # read input file
+    l1 = []
+    filename = "input.txt"
+    open(filename,"r")
+    l1 = readdlm(filename,comment_char='!')[:,1]
 
-freq = Int(nt/ns)
+    nd = Int64(l1[1])       #NXF=NYF, resolution
+    nt = Int64(l1[2])       #NT, number of time step
+    re = Float64(l1[3])     #Re, Reynolds number 
+    dt = Float64(l1[4])     #dt; time step
+    ns = Int64(l1[5])       #nf;number of files to store
+    isolver = Int64(l1[6])  #isolver:[1]ikeda, [2]arakawa
+    isc = Int64(l1[7])      #isc; [0]don't write-screen, [1]write-screen
+    ich = Int64(l1[8])      #ich; Check for the file
+    ipr = Int64(l1[9])      #ipr; [1]TGV, [2]VM, [3]Decay 
+    ndc = Int64(l1[10])     #NXC=NYC, coarse resolution
+    ichkp = Int64(l1[11])   #ichkp; [0]t=0, [1]checkpoint
+    istart = Int64(l1[12])  #istart; last saved file (starting point)
 
-if (ich != 19)
-    print("Check input.txt file")
-end
-# assign parameters
-nx = nd
-ny = nd
+    freq = Int(nt/ns)
 
-nxc = ndc
-nyc = ndc
-
-lx = 2.0*pi
-ly = 2.0*pi
-
-dx = lx/Float64(nx)
-dy = ly/Float64(ny)
-
-dxc = lx/Float64(nxc)
-dyc = ly/Float64(nyc)
-
-ifile = 0
-tchkp = ichkp*freq*istart*dt
-folder = "data_"*string(nx)*"_v2"
-
-P    = plan_fft(rand(nx,ny))
-Pc   = plan_fft(rand(nxc,nyc))
-P2   = plan_fft(rand(2*nx,2*ny))
-P2c  = plan_fft(rand(2*nxc,2*nyc))
-iP   = plan_ifft(rand(nx,ny))
-iPc  = plan_ifft(rand(nxc,nyc))
-iP2  = plan_ifft(rand(2*nx,2*ny))
-iP2c = plan_ifft(rand(2*nxc,2*nyc))
-rP   = plan_rfft(rand(nx,ny))
-rPc  = plan_rfft(rand(nxc,nyc))
-rP2  = plan_rfft(rand(2*nx,2*ny))
-rP2c = plan_rfft(rand(2*nxc,2*nyc))
-
-#%%
-# set the initial condition based on the problem selected
-if (ipr == 1)
-    w0 = tgv_ic(nx,ny) # taylor-green vortex problem
-elseif (ipr == 2)
-    w0 = vm_ic(nx,ny) # vortex-merger problem
-elseif (ipr == 3)
-    w0 = decay_ic(nx,ny,dx,dy,iP) # decaying homegeneous isotropic turbulence problem
-end
-#%%  
-if ichkp == 0
-    w = w0
-elseif ichkp == 1
-    print(istart)
-    file_input = "spectral/"*folder*"/04_vorticity/w_"*string(istart)*".csv"
-    w = readdlm(file_input, ',', Float64)
-end
-#%%
-# compute frequencies, vorticity field in frequency domain
-kx = fftfreq(nx,nx)
-ky = fftfreq(ny,ny)
-
-kx = reshape(kx,(nx,1))
-ky = reshape(ky,(1,ny))
-
-data = complex.(w[1:end-1,1:end-1],0.0)
-
-wnf = P*data # fourier space forward
-
-#%%
-# initialize variables for time integration
-a1, a2, a3 = 8.0/15.0, 2.0/15.0, 1.0/3.0
-g1, g2, g3 = 8.0/15.0, 5.0/12.0, 3.0/4.0
-r2, r3 = -17.0/60.0, -5.0/12.0
-
-k2 = @. kx^2 + ky^2
-k2[1,1] = 1.0e-12
-
-z = 0.5*dt*k2/re
-d1 = a1*z
-d2 = a2*z
-d3 = a3*z
-
-jnf = Array{Complex{Float64}}(undef,nx,ny)
-j1f = Array{Complex{Float64}}(undef,nx,ny)
-j2f = Array{Complex{Float64}}(undef,nx,ny)
-
-w1f = Array{Complex{Float64}}(undef,nx,ny)
-w2f = Array{Complex{Float64}}(undef,nx,ny)
-
-#%%
-clock_time_init = time()
-# time integration using hybrid third-order Runge-Kutta implicit Crank-Nicolson scheme
-# refer to Orlandi: Fluid flow phenomenon
-
-for n in Int(ichkp*istart*freq)+1:nt
-    looptime = time()
-    t = n*dt
-    # 1st step
-    jnf[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,wnf,iP2,rP2)    
-    w1f[:,:] = @. ((1.0 - d1)/(1.0 + d1))*wnf + (g1*dt*jnf)/(1.0 + d1)
-    w1f[1,1] = 0.0
-
-    # 2nd step
-    j1f[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,w1f,iP2,rP2)
-    w2f[:,:] = @. ((1.0 - d2)/(1.0 + d2))*w1f + (r2*dt*jnf + g2*dt*j1f)/(1.0 + d2)
-    w2f[1,1] = 0.0
-
-    # 3rd step
-    j2f[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,w2f,iP2,rP2)
-    wnf[:,:] = @. ((1.0 - d3)/(1.0 + d3))*w2f + (r3*dt*j1f + g3*dt*j2f)/(1.0 + d3)
-    wnf[1,1] = 0.0
-    a = time() - looptime
-    println("Avg. "*string(round(a/3; digits=5))*"s per RK3 step")
-    if any(isnan.(wnf))
-        println("WARNING: NaN encountered")
-        println("Code will exit")
-        file_input = "spectral/"*folder*"/04_vorticity/w_"*string(Int(round(n/freq-1)))*".csv"
-        wback = readdlm(file_input, ',', Float64) 
-        wnf[:,:] = P*(complex.(wback[1:end-1,1:end-1],0.0))
-        break
-        # println("SOLVER WILL BACKTRACK TO PREVIOUS SOLUTION")
-        # file_input = "spectral/"*folder*"/04_vorticity/w_"*string(Int(round(n/freq-5)))*".csv"
-        # wback = readdlm(file_input, ',', Float64) 
-        # wnf = P*(complex.(wback[1:end-1,1:end-1],0.0))
+    if (ich != 19)
+        print("Check input.txt file")
     end
-    if (mod(n,freq) == 0)
-        write_data(nx,ny,dx,dy,kx,ky,k2,nxc,nyc,dxc,dyc,wnf,w0,n,freq,dt)
-        println("n: $n, t = $(round(t+tchkp; digits=4)) $(size(wnf)[1])x$(size(wnf)[2])")
+    # assign parameters
+    nx = nd
+    ny = nd
+
+    nxc = ndc
+    nyc = ndc
+
+    lx = 2.0*pi
+    ly = 2.0*pi
+
+    dx = lx/Float64(nx)
+    dy = ly/Float64(ny)
+
+    dxc = lx/Float64(nxc)
+    dyc = ly/Float64(nyc)
+
+    # compute frequencies, vorticity field in frequency domain
+    kx = fftfreq(nx,nx)
+    ky = fftfreq(ny,ny)
+
+    kx = reshape(kx,(nx,1))
+    ky = reshape(ky,(1,ny))
+
+    k2 = @. kx^2 + ky^2
+    k2[1,1] = 1.0e-12
+
+    P    = plan_fft(rand(nx,ny))
+    Pc   = plan_fft(rand(nxc,nyc))
+    P2   = plan_fft(rand(2*nx,2*ny))
+    P2c  = plan_fft(rand(2*nxc,2*nyc))
+    iP   = plan_ifft(rand(nx,ny))
+    iPc  = plan_ifft(rand(nxc,nyc))
+    iP2  = plan_ifft(rand(2*nx,2*ny))
+    iP2c = plan_ifft(rand(2*nxc,2*nyc))
+    rP   = plan_rfft(rand(nx,ny))
+    rPc  = plan_rfft(rand(nxc,nyc))
+    rP2  = plan_rfft(rand(2*nx,2*ny))
+    rP2c = plan_rfft(rand(2*nxc,2*nyc))
+
+    wnf = zeros(Complex{Float64},nx,ny)
+    w1f = zeros(Complex{Float64},nx,ny)
+    w2f = zeros(Complex{Float64},nx,ny)
+
+    jnf = zeros(Complex{Float64},nx,ny)
+    j1f = zeros(Complex{Float64},nx,ny)
+    j2f = zeros(Complex{Float64},nx,ny)
+    
+    s = zeros(nx+1,ny+1)
+    j = zeros(nx+1,ny+1)    
+    w = zeros(nx+1,ny+1)    #lol
+    
+
+    #%%
+    # set the initial condition based on the problem selected
+    if (ipr == 1)
+        w0 = tgv_2D_ic(nx,ny) # taylor-green vortex problem
+    elseif (ipr == 2)
+        w0 = vm_ic(nx,ny) # vortex-merger problem
+    elseif (ipr == 3)
+        w0 = decay_ic(nx,ny,dx,dy,iP) # decaying homegeneous isotropic turbulence problem
     end
+    #%%  
+    ifile = 0
+    tchkp = ichkp*freq*istart*dt
+    folder = "data_"*string(nx)*"_v2"
+    if ichkp == 0
+        wnf[:,:] = P*(complex.(w0[1:end-1,1:end-1],0.0)) # fourier space forward
+        s[:,:] = fps(nx,ny,dx,dy,k2,-wnf,iP)
+        w[:,:] = wave2phy(nx,ny,wnf,iP)
+               
+        kxc = fftfreq(nxc,nxc)
+        kyc = fftfreq(nyc,nyc)
+        kxc = reshape(kxc,(nxc,1))
+        kyc = reshape(kyc,(1,nyc))
+                
+        k2c = @. kxc^2 + kyc^2
+        k2c[1,1] = 1.0e-12
+                 
+        jnf[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,wnf,iP2,rP2)
+        j = wave2phy(nx,ny,jnf,iP) # jacobian for fine solution field
+            
+        jc = zeros(nxc+1,nyc+1) # coarsened(jacobian field)
+        jfc = coarsen(nx,ny,nxc,nyc,jf) # coarsened(jacobian field) in frequency domain
+        jc = wave2phy(nxc,nyc,jfc,iPc) # coarsened(jacobian field) physical space
+                   
+        wfc = coarsen(nx,ny,nxc,nyc,wnf)       
+        jcoarsef = nonlineardealiased(nxc,nyc,kxc,kyc,k2c,wfc,iP2c,rP2c) # jacobian(coarsened solution field) in frequency domain
+        jcoarse = wave2phy(nxc,nyc,jcoarsef,iPc) # jacobian(coarsened solution field) physical space
+                
+        sgs = jc - jcoarse
+        write_data(jc,jcourse,sgs,w,s,0,folder)
+    elseif ichkp == 1
+        print(istart)
+        file_input = "spectral/"*folder*"/04_vorticity/w_"*string(istart)*".csv"
+        w = readdlm(file_input, ',', Float64)
+    end
+    #%%
+
+    wnf[:,:] = P*(complex.(w[1:end-1,1:end-1],0.0)) # fourier space forward
+
+    #%%
+    # initialize variables for time integration
+    a1, a2, a3 = 8.0/15.0, 2.0/15.0, 1.0/3.0
+    g1, g2, g3 = 8.0/15.0, 5.0/12.0, 3.0/4.0
+    r2, r3 = -17.0/60.0, -5.0/12.0
+
+    z = 0.5*dt*k2/re
+    d1 = a1*z
+    d2 = a2*z
+    d3 = a3*z
+
+    #%%
+    clock_time_init = time()
+    # time integration using hybrid third-order Runge-Kutta implicit Crank-Nicolson scheme
+    # refer to Orlandi: Fluid flow phenomenon
+
+
+    for n in Int(ichkp*istart*freq)+1:nt
+        looptime = time()
+        t = n*dt
+        # 1st step
+        jnf[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,wnf,iP2,rP2)    
+        w1f[:,:] = @. ((1.0 - d1)/(1.0 + d1))*wnf + (g1*dt*jnf)/(1.0 + d1)
+        w1f[1,1] = 0.0
+
+        # 2nd step
+        j1f[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,w1f,iP2,rP2)
+        w2f[:,:] = @. ((1.0 - d2)/(1.0 + d2))*w1f + (r2*dt*jnf + g2*dt*j1f)/(1.0 + d2)
+        w2f[1,1] = 0.0
+
+        # 3rd step
+        j2f[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,w2f,iP2,rP2)
+        wnf[:,:] = @. ((1.0 - d3)/(1.0 + d3))*w2f + (r3*dt*j1f + g3*dt*j2f)/(1.0 + d3)
+        wnf[1,1] = 0.0
+        a = time() - looptime
+        println("Avg. "*string(round(a/3; digits=5))*"s per RK3 step")
+        if any(isnan.(wnf))
+            println("WARNING: NaN encountered")
+            println("Code will exit")
+            file_input = "spectral/"*folder*"/04_vorticity/w_"*string(Int(round(n/freq-1)))*".csv"
+            wback = readdlm(file_input, ',', Float64) 
+            wnf[:,:] = P*(complex.(wback[1:end-1,1:end-1],0.0))
+            break
+            # println("SOLVER WILL BACKTRACK TO PREVIOUS SOLUTION")
+            # file_input = "spectral/"*folder*"/04_vorticity/w_"*string(Int(round(n/freq-5)))*".csv"
+            # wback = readdlm(file_input, ',', Float64) 
+            # wnf = P*(complex.(wback[1:end-1,1:end-1],0.0))
+        end
+        if (mod(n,freq) == 0)
+            s = fps(nx,ny,dx,dy,k2,-wnf,iP)
+            w = wave2phy(nx,ny,wnf,iP)
+           
+            kxc = fftfreq(nxc,nxc)
+            kyc = fftfreq(nyc,nyc)
+            kxc = reshape(kxc,(nxc,1))
+            kyc = reshape(kyc,(1,nyc))
+            
+            k2c = @. kxc^2 + kyc^2
+            k2c[1,1] = 1.0e-12
+             
+            j = wave2phy(nx,ny,jnf,iP) # jacobian for fine solution field
+        
+            jc = zeros(nxc+1,nyc+1) # coarsened(jacobian field)
+            jfc = coarsen(nx,ny,nxc,nyc,jnf) # coarsened(jacobian field) in frequency domain
+            jc = wave2phy(nxc,nyc,jfc,iPc) # coarsened(jacobian field) physical space
+               
+            wfc = coarsen(nx,ny,nxc,nyc,wnf)       
+            jcoarsef = nonlineardealiased(nxc,nyc,kxc,kyc,k2c,wfc,iP2c,rP2c) # jacobian(coarsened solution field) in frequency domain
+            jcoarse = wave2phy(nxc,nyc,jcoarsef,iPc) # jacobian(coarsened solution field) physical space
+            
+            sgs = jc - jcoarse
+            write_data(jc,jcourse,sgs,w,s,n,folder)
+            println("n: $n, t = $(round(t+tchkp; digits=4)) $(size(wnf)[1])x$(size(wnf)[2])")
+        end
+    end
+    w = wave2phy(nx,ny,wnf,P) # final vorticity field in physical space            
+
+    total_clock_time = time() - clock_time_init
+    print("Total clock time=", total_clock_time)  
+
+    #%%
+    # compute the exact, initial and final energy spectrum for DHIT problem
+    if (ipr == 3)
+        en, n = energy_spectrum(nx,ny,w,P)
+        en0, n = energy_spectrum(nx,ny,w0,P)
+        k = LinRange(1,n,n)
+        
+        k0 = 10.0
+        c = @. 4.0/(3.0*sqrt(pi)*(k0^5))           
+        ese = @. c*(k^4)*exp(-(k/k0)^2)
+        
+        writedlm("spectral/energy_spectral_"*string(nd)*"_"*string(Int(re))*".csv", en, ',')
+    end
+    #%%
+
+    #%%
+    # energy spectrum plot for DHIT problem
+    if (ipr == 3)
+        # fig, ax = plt.subplots()
+        # fig.set_size_inches(7,5)
+        
+        line = 100*k^(-3.0)
+        
+        # ax.loglog(k,ese[:],'k', lw = 2, label='Exact')
+        # ax.loglog(k,en0[1:],'r', ls = '--', lw = 2, label='$t = 0.0$')
+        # ax.loglog(k,en[1:], 'b', lw = 2, label = '$t = '+string(dt*nt)+'$')
+        # #ax.loglog(k,en_a[1:], 'y', lw = 2, label = '$t = '+string(dt*nt)+'$')
+        # ax.loglog(k,line, 'g--', lw = 2, label = 'k^-3')
+        
+        # plt.xlabel('$K$')
+        # plt.ylabel('$E(K)$')
+        # plt.legend(loc=0)
+        # plt.ylim(1e-16,1e-0)
+        
+
+        p1 = plot(k,ese,
+            lw=2,
+            linecolor = :green,
+            xscale = :log,
+            yscale = :log,
+            xlabel = "k",
+            ylabel = "E(k)",
+            ylims = (1e-16,1e-0),
+            label="Exact",
+            title = "TKE spectrum",
+            legend = :bottomleft,
+            size=(900,900))
+            
+        p1 = plot!(k,en0[2:end],
+            lw=2,
+            ls = :dash,
+            linecolor = :red,
+            xscale = :log,
+            yscale = :log,
+            label="t = 0.0")
+
+        p1 = plot!(k,en[2:end],
+            lw=2,
+            ls = :dash,
+            linecolor = :blue,
+            xscale = :log,
+            yscale = :log,
+            label="t = 0.0"*string(dt*nt))
+
+        p1 = plot!(k,line,
+            lw=2,
+            ls = :dash,
+            linecolor = :black,
+            xscale = :log,
+            yscale = :log,
+            label="k^-3")
+        plot(p1)
+        savefig("spectral/es_spectral.png")    
+
+    end
+    # #%%
+    # fig = plt.figure(figsize=(10,6))
+    # ax = fig.gca(projection='3d', proj_type = 'ortho')
+
+    # X, Y = np.mgrid[0:2.0*pi+dx:dx, 0:2.0*pi+dy:dy]
+
+    # surf = ax.plot_surface(X, Y, w, cmap='coolwarm',vmin=-30, vmax=30,
+    #                        linewidth=0, antialiased=False,rstride=1,
+    #                         cstride=1)
+
+    # fig.colorbar(surf, shrink=0.5, aspect=5)
+    # ax.view_init(elev=60, azim=30)
+    # plt.show()
+
+    # #%%
+    # savefig("vorticity_3D1.png", dpi=30)
 end
-w = wave2phy(nx,ny,wnf,P) # final vorticity field in physical space            
 
-total_clock_time = time() - clock_time_init
-print("Total clock time=", total_clock_time)  
-
-#%%
-# compute the exact, initial and final energy spectrum for DHIT problem
-if (ipr == 3)
-    en, n = energy_spectrum(nx,ny,w,P)
-    en0, n = energy_spectrum(nx,ny,w0,P)
-    k = LinRange(1,n,n)
-    
-    k0 = 10.0
-    c = @. 4.0/(3.0*sqrt(pi)*(k0^5))           
-    ese = @. c*(k^4)*exp(-(k/k0)^2)
-    
-    writelm("spectral/energy_spectral_"*string(nd)*"_"*string(Int(re))*".csv", en, ',')
-end
-#%%
-# contour plot for initial and final vorticity
-# fig, axs = plt.subplots(1,2,sharey=True,figsize=(9,5))
-
-# cs = axs[0].contourf(w0.T, 120, cmap = 'jet', interpolation='bilinear')
-# axs[0].text(0.4, -0.1, '$t = 0.0$', transform=axs[0].transAxes, fontsize=16, fontweight='bold', va='top')
-
-# cs = axs[1].contourf(w.T, 120, cmap = 'jet', interpolation='bilinear')
-# axs[1].text(0.4, -0.1, '$t = '+string(dt*nt)+'$', transform=axs[1].transAxes, fontsize=16, fontweight='bold', va='top')
-
-# fig.tight_layout() 
-
-# fig.subplots_adjust(bottom=0.15)
-
-# cbar_ax = fig.add_axes([0.22, -0.05, 0.6, 0.04])
-# fig.colorbar(cs, cax=cbar_ax, orientation='horizontal')
-# plt.show()
-
-# fig.savefig("field_spectral.png", bbox_inches = 'tight')
-
-
-#%%
-# energy spectrum plot for DHIT problem
-if (ipr == 3)
-    #en_a = loadtxt("energy_arakawa_"+string(nd)+"_"+string(Int(re))+".csv") 
-    # fig, ax = plt.subplots()
-    # fig.set_size_inches(7,5)
-    
-    line = 100*k^(-3.0)
-    
-    # ax.loglog(k,ese[:],'k', lw = 2, label='Exact')
-    # ax.loglog(k,en0[1:],'r', ls = '--', lw = 2, label='$t = 0.0$')
-    # ax.loglog(k,en[1:], 'b', lw = 2, label = '$t = '+string(dt*nt)+'$')
-    # #ax.loglog(k,en_a[1:], 'y', lw = 2, label = '$t = '+string(dt*nt)+'$')
-    # ax.loglog(k,line, 'g--', lw = 2, label = 'k^-3')
-    
-    # plt.xlabel('$K$')
-    # plt.ylabel('$E(K)$')
-    # plt.legend(loc=0)
-    # plt.ylim(1e-16,1e-0)
-    
-
-    p1 = plot(k,ese,
-        lw=2,
-        linecolor = :green,
-        xscale = :log,
-        yscale = :log,
-        xlabel = "k",
-        ylabel = "E(k)",
-        ylims = (1e-16,1e-0),
-        label="Exact",
-        title = "TKE spectrum",
-        legend = :bottomleft)
-    p1 = plot!(k,en0[2:end],
-        lw=2,
-        ls = :dash,
-        linecolor = :red,
-        xscale = :log,
-        yscale = :log,
-        label="t = 0.0")
-    p1 = plot!(k,en[2:end],
-        lw=2,
-        ls = :dash,
-        linecolor = :blue,
-        xscale = :log,
-        yscale = :log,
-        label="t = 0.0"*string(dt*nt))
-    p1 = plot!(k,line,
-        lw=2,
-        ls = :dash,
-        linecolor = :black,
-        xscale = :log,
-        yscale = :log,
-        label="k^-3")
-    plot(p1)
-    savefig("es_spectral.png")    
-
-end
-# #%%
-# fig = plt.figure(figsize=(10,6))
-# ax = fig.gca(projection='3d', proj_type = 'ortho')
-
-# X, Y = np.mgrid[0:2.0*pi+dx:dx, 0:2.0*pi+dy:dy]
-
-# surf = ax.plot_surface(X, Y, w, cmap='coolwarm',vmin=-30, vmax=30,
-#                        linewidth=0, antialiased=False,rstride=1,
-#                         cstride=1)
-
-# fig.colorbar(surf, shrink=0.5, aspect=5)
-# ax.view_init(elev=60, azim=30)
-# plt.show()
-
-# #%%
-# savefig("vorticity_3D1.png", dpi=30)
-
+main()
 
 
 
