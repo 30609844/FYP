@@ -457,6 +457,24 @@ function nonlinear(nx,ny,kx,ky,k2,wf,iP,P)
     return jf
 end
 
+function w_plot(nx,ny,dt,w0,w,folder,n)
+    c1 = heatmap(LinRange(0,2pi,nx+1),LinRange(0,2pi,ny+1),w0,
+        xlabel = "x",
+        ylabel = "y",
+        title = "t = 0.0",
+        clim=(minimum(w0),maximum(w0)),
+        colorbar=true)
+    c2 = heatmap(LinRange(0,2pi,nx+1),LinRange(0,2pi,ny+1),w,
+        xlabel = "x",
+        ylabel = "y",
+        title = "t = $(n*dt)",
+        clim=(minimum(w0),maximum(w0)),
+        colorbar=true)
+    filename = "spectral/"*folder*"/field_spectral_"*string(n)*".png"
+    plot(c1,c2)
+    png(filename)
+end
+
 #%% coarsening
 function write_data(jc,jcourse,sgs,w,s,n,folder)
     
@@ -475,7 +493,7 @@ function write_data(jc,jcourse,sgs,w,s,n,folder)
     # s : streamfunction in physical space for fine grid (including periodic boundaries)
     
 
-    if !isdir("spectral//"*folder)
+    if !isdir("spectral/"*folder)
         mkdir("spectral/"*folder)
         mkdir("spectral/"*folder*"/01_coarsened_jacobian_field")
         mkdir("spectral/"*folder*"/02_jacobian_coarsened_field")
@@ -484,34 +502,16 @@ function write_data(jc,jcourse,sgs,w,s,n,folder)
         mkdir("spectral/"*folder*"/05_streamfunction")
     end
 
-    filename = "spectral/"*folder*"/01_coarsened_jacobian_field/J_fourier_"*string(Int(round(n/freq)))*".csv"  
+    filename = "spectral/"*folder*"/01_coarsened_jacobian_field/J_fourier_"*string(n)*".csv"  
     writedlm(filename,jc,',')
-    filename = "spectral/"*folder*"/02_jacobian_coarsened_field/J_coarsen_"*string(Int(round(n/freq)))*".csv"
+    filename = "spectral/"*folder*"/02_jacobian_coarsened_field/J_coarsen_"*string(n)*".csv"
     writedlm(filename,jcoarse,',')
-    filename = "spectral/"*folder*"/03_subgrid_scale_term/sgs_"*string(Int(round(n/freq)))*".csv"
+    filename = "spectral/"*folder*"/03_subgrid_scale_term/sgs_"*string(n)*".csv"
     writedlm(filename,sgs,',')
-    filename = "spectral/"*folder*"/04_vorticity/w_"*string(Int(round(n/freq)))*".csv"
+    filename = "spectral/"*folder*"/04_vorticity/w_"*string(n)*".csv"
     writedlm(filename,w,',')
-    filename = "spectral/"*folder*"/05_streamfunction/s_"*string(Int(round(n/freq)))*".csv"
+    filename = "spectral/"*folder*"/05_streamfunction/s_"*string(n)*".csv"
     writedlm(filename,s,',')
-    
-    if mod(n,50*freq) == 0
-        c1 = heatmap(LinRange(0,2pi,nx+1),LinRange(0,2pi,ny+1),w0,
-                    xlabel = "x",
-                    ylabel = "y",
-                    title = "t = 0.0",
-                    clim=(minimum(w0),maximum(w0)),
-                    colorbar=true)
-        c2 = heatmap(LinRange(0,2pi,nx+1),LinRange(0,2pi,ny+1),w,
-                    xlabel = "x",
-                    ylabel = "y",
-                    title = "t = $(n*dt)",
-                    clim=(minimum(w0),maximum(w0)),
-                    colorbar=true)
-        filename = "spectral/"*folder*"/field_spectral_"*string(Int(round(n/freq)))*".png"
-        plot(c1,c2)
-        png(filename)
-    end
 end
 #%% 
 
@@ -718,8 +718,11 @@ function main()
             jcoarse[:,:] = wave2phy(nxc,nyc,jcoarsef,iPc) # jacobian(coarsened solution field) physical space
                 
             sgs = jc - jcoarse
-            write_data(jc,jcourse,sgs,w,s,n,folder)
+            write_data(jc,jcourse,sgs,w,s,Int(round(n/freq)),folder)
             println("n: $n, t = $(round(t+tchkp; digits=4)) $(size(wnf)[1])x$(size(wnf)[2])")
+        end
+        if (mod(n,50*freq) == 0)
+            w_plot(nx,ny,dt,w0,w,folder,n)
         end
     end
     w = wave2phy(nx,ny,wnf,P) # final vorticity field in physical space            
