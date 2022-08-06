@@ -473,7 +473,7 @@ function w_plot(nx,ny,dt,w0,w,folder,n)
 end
 
 #%% coarsening
-function write_data(jc,jcourse,sgs,w,s,n,folder)
+function write_data(jc,jcoarse,sgs,w,s,n,folder)
     
     
     # write the data to .csv files for post-processing
