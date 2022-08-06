@@ -636,7 +636,7 @@ function main()
         jcoarse[:,:] = wave2phy(nxc,nyc,jcoarsef,iPc) # jacobian(coarsened solution field) physical space
                 
         sgs = jc - jcoarse
-        write_data(jc,jcourse,sgs,w,s,0,folder)
+        write_data(jc,jcoarse,sgs,w,s,0,folder)
     elseif ichkp == 1
         print(istart)
         file_input = "spectral/"*folder*"/04_vorticity/w_"*string(istart)*".csv"
