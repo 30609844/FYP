@@ -625,7 +625,7 @@ function main()
         j[:,:] = wave2phy(nx,ny,jnf,iP) # jacobian for fine solution field
             
          # coarsened(jacobian field)
-        jfc[:,:] = coarsen(nx,ny,nxc,nyc,jf) # coarsened(jacobian field) in frequency domain
+        jfc[:,:] = coarsen(nx,ny,nxc,nyc,jnf) # coarsened(jacobian field) in frequency domain
         jc[:,:] = wave2phy(nxc,nyc,jfc,iPc) # coarsened(jacobian field) physical space
                    
         wfc[:,:] = coarsen(nx,ny,nxc,nyc,wnf)       
@@ -707,7 +707,7 @@ function main()
             j[:,:] = wave2phy(nx,ny,jnf,iP) # jacobian for fine solution field
             
             # coarsened(jacobian field)
-            jfc[:,:] = coarsen(nx,ny,nxc,nyc,jf) # coarsened(jacobian field) in frequency domain
+            jfc[:,:] = coarsen(nx,ny,nxc,nyc,jnf) # coarsened(jacobian field) in frequency domain
             jc[:,:] = wave2phy(nxc,nyc,jfc,iPc) # coarsened(jacobian field) physical space
                    
             wfc[:,:] = coarsen(nx,ny,nxc,nyc,wnf)       
