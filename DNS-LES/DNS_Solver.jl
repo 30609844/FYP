@@ -639,7 +639,7 @@ function main()
         sgs = jc - jcoarse
         write_data(jc,jcoarse,sgs,w,s,0,folder)
     elseif ichkp == 1
-        print(istart)
+        println(istart)
         file_input = "spectral/"*folder*"/04_vorticity/w_"*string(0)*".csv"
         w0 = readdlm(file_input, ',', Float64)
         file_input = "spectral/"*folder*"/04_vorticity/w_"*string(istart)*".csv"
