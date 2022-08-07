@@ -640,6 +640,8 @@ function main()
         write_data(jc,jcoarse,sgs,w,s,0,folder)
     elseif ichkp == 1
         print(istart)
+        file_input = "spectral/"*folder*"/04_vorticity/w_"*string(0)*".csv"
+        w0 = readdlm(file_input, ',', Float64)
         file_input = "spectral/"*folder*"/04_vorticity/w_"*string(istart)*".csv"
         w = readdlm(file_input, ',', Float64)
     end
