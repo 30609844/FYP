@@ -16,6 +16,7 @@ println(string(Threads.nthreads())*" THREADS")
 using FFTW
 FFTW.set_num_threads(Threads.nthreads())
 using Plots, DelimitedFiles
+using CUDA
 gr()
 
 #%%
@@ -531,7 +532,9 @@ function main()
     ipr = Int64(l1[9])      #ipr; [1]TGV, [2]VM, [3]Decay 
     ndc = Int64(l1[10])     #NXC=NYC, coarse resolution
     ichkp = Int64(l1[11])   #ichkp; [0]t=0, [1]checkpoint
+    ichkp = 1   #ichkp; [0]t=0, [1]checkpoint
     istart = Int64(l1[12])  #istart; last saved file (starting point)
+    istart = 275  #5500 istart; last saved file (starting point)
 
     freq = Int(nt/ns)
 
@@ -720,9 +723,9 @@ function main()
             write_data(jc,jcoarse,sgs,w,s,Int(round(n/freq)),folder)
             @printf("n: %3i, t = %6.4f %4ix%4i\n",n,t+tchkp,nx,ny)
             # println("n: $n, t = $(round(t+tchkp; digits=4)) $(size(wnf)[1])x$(size(wnf)[2])")
-        end
-        if (mod(n,50*freq) == 0)
-            w_plot(nx,ny,dt,w0,w,folder,n)
+            if (mod(n,50*freq) == 0)
+                w_plot(nx,ny,dt,w0,w,folder,n)
+            end
         end
     end
     w = wave2phy(nx,ny,wnf,P) # final vorticity field in physical space            
