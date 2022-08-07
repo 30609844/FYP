@@ -461,6 +461,17 @@ function nonlinear(nx,ny,kx,ky,k2,wf,iP,P)
 end
 
 function w_plot(nx,ny,dt,w0,w,folder,n)
+    # Plots the vorticity field
+
+    # Inputs
+    # ------
+    # nx,ny : number of grid points in x and y direction on fine grid 
+    # dt: Time step
+    # folder : Destination folder
+    # Outputs/ write
+    # ------
+    # w0 : Initial vorticity field
+    # w : vorticity field at time t = n*dt
     c1 = heatmap(LinRange(0,2pi,nx+1),LinRange(0,2pi,ny+1),w0,
         title = "t = 0.0",
         clim=(minimum(w0),maximum(w0)),
