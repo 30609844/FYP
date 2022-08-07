@@ -721,7 +721,7 @@ function main()
                 
             sgs = jc - jcoarse
             write_data(jc,jcoarse,sgs,w,s,Int(round(n/freq)),folder)
-            @printf("n: %3i, t = %6.4f %4ix%4i\n",n,t+tchkp,nx,ny)
+            @printf("n: %3i, t = %6.4f %4ix%4i\n",n,t,nx,ny)
             # println("n: $n, t = $(round(t+tchkp; digits=4)) $(size(wnf)[1])x$(size(wnf)[2])")
             if (mod(n,50*freq) == 0)
                 w_plot(nx,ny,dt,w0,w,folder,n)
