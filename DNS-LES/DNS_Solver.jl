@@ -333,7 +333,7 @@ function filter_gauss(grid_ratio,k2,uf)
 end 
 
 #%% Compute the Jacobian with dealiasing 
-function nonlineardealiased(nx,ny,kx,ky,k2,wf,iP,rP,opt)   
+function nonlineardealiased(nx,ny,kx,ky,k2,wf,P,iP,rP,opt)   
     
     
     # Compute the Jacobian with dealiasing (Default 3/2)
@@ -345,7 +345,7 @@ function nonlineardealiased(nx,ny,kx,ky,k2,wf,iP,rP,opt)
     # k2 : absolute wave number over 2D domain
     # wf : vorticity field in frequency domain (excluding periodic boundaries)
     # iP : IFFT matrix
-    # rP2 : FFT matrix with real coeffs
+    # rP : FFT matrix with real coeffs
     # opt : Method of dealiasing (1 for 3/2 padding, 2 for FT, 3 for FS)
     
     # Output
@@ -436,7 +436,6 @@ function nonlineardealiased(nx,ny,kx,ky,k2,wf,iP,rP,opt)
         jacp = @. j1*j2 - j3*j4
 
         jacpf = rP*jacp
-
         
         jf = zeros(Complex{Float64},nx,ny)
         
@@ -572,7 +571,7 @@ function main()
     ich = Int64(l1[8])      #ich; Check for the file
     ipr = Int64(l1[9])      #ipr; [1]TGV, [2]VM, [3]Decay 
     ndc = Int64(l1[10])     #NXC=NYC, coarse resolution
-    opt = Int64(l1[11])     #Dealiasing algorithm:[1] 3/2 padding, [2] FT, [3], FS
+    opt = Int64(l1[11])     #Dealiasing algorithm:[1]3/2 padding, [2]FT, [3],FS
     ichkp = Int64(l1[12])   #ichkp; [0]t=0, [1]checkpoint
     istart = Int64(l1[13])  #istart; last saved file (starting point)
 
@@ -608,8 +607,6 @@ function main()
 
     k2 = @. kx^2 + ky^2
     k2[1,1] = 1.0e-12
-
-
 
     P    = plan_fft(rand(nx,ny))
     Pc   = plan_fft(rand(nxc,nyc))
@@ -669,7 +666,7 @@ function main()
         k2c = @. kxc^2 + kyc^2
         k2c[1,1] = 1.0e-12
                  
-        jnf[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,wnf,iP2,rP2)
+        jnf[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,wnf,P,iP2,rP2,opt)
         j[:,:] = wave2phy(nx,ny,jnf,iP) # jacobian for fine solution field
             
          # coarsened(jacobian field)
@@ -677,7 +674,7 @@ function main()
         jc[:,:] = wave2phy(nxc,nyc,jfc,iPc) # coarsened(jacobian DNS field) physical space
                    
         wfc[:,:] = coarsen(nx,ny,nxc,nyc,wnf)       
-        jcoarsef[:,:] = nonlineardealiased(nxc,nyc,kxc,kyc,k2c,wfc,iP2c,rP2c) # jacobian(coarsened solution field) in frequency domain
+        jcoarsef[:,:] = nonlineardealiased(nxc,nyc,kxc,kyc,k2c,wfc,Pc,iP2c,rP2c,opt) # jacobian(coarsened solution field) in frequency domain
         jcoarse[:,:] = wave2phy(nxc,nyc,jcoarsef,iPc) # jacobian(coarsened solution field) physical space
                 
         sgs = jc - jcoarse # THIS SGS IS SUBTRACTED ON THE RHS
@@ -714,17 +711,17 @@ function main()
         looptime = time()
         t = n*dt
         # 1st step
-        jnf[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,wnf,iP2,rP2)    
+        jnf[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,wnf,P,iP2,rP2,opt)    
         w1f[:,:] = @. ((1.0 - d1)/(1.0 + d1))*wnf + (g1*dt*jnf)/(1.0 + d1)
         w1f[1,1] = 0.0
 
         # 2nd step
-        j1f[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,w1f,iP2,rP2)
+        j1f[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,w1f,P,iP2,rP2,opt)
         w2f[:,:] = @. ((1.0 - d2)/(1.0 + d2))*w1f + (r2*dt*jnf + g2*dt*j1f)/(1.0 + d2)
         w2f[1,1] = 0.0
 
         # 3rd step
-        j2f[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,w2f,iP2,rP2)
+        j2f[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,w2f,P,iP2,rP2,opt)
         wnf[:,:] = @. ((1.0 - d3)/(1.0 + d3))*w2f + (r3*dt*j1f + g3*dt*j2f)/(1.0 + d3)
         wnf[1,1] = 0.0
         a = time() - looptime
