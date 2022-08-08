@@ -352,8 +352,6 @@ function nonlineardealiased(nx,ny,kx,ky,k2,wf,iP,rP,opt)
     # ------
     # jf : jacobian in frequency domain (excluding periodic boundaries)
     #      (d(psi)/dy*d(omega)/dx - d(psi)/dx*d(omega)/dy)
-
-
     
     j1f = @. -1.0im*kx*wf/k2
     j2f = @. 1.0im*ky*wf
