@@ -712,9 +712,9 @@ function main()
         write_data(jc,jcoarse,sgs,w,s,w_LES,s_LES,0,folder)
     elseif ichkp == 1
         println(istart)
-        file_input = "spectral/"*folder*"/04_vorticity/w_"*string(0)*".csv"
+        file_input = "spectral/"*folder*"/04_DNS_vorticity/w_"*string(0)*".csv"
         w0[:,:] = readdlm(file_input, ',', Float64)
-        file_input = "spectral/"*folder*"/04_vorticity/w_"*string(istart)*".csv"
+        file_input = "spectral/"*folder*"/04_DNS_vorticity/w_"*string(istart)*".csv"
         w[:,:] = readdlm(file_input, ',', Float64)
     end
     #%%
@@ -761,7 +761,7 @@ function main()
         if any(isnan.(wnf))
             println("WARNING: NaN encountered")
             println("Code will exit")
-            file_input = "spectral/"*folder*"/04_vorticity/w_"*string(Int(round(n/freq-1)))*".csv"
+            file_input = "spectral/"*folder*"/04_DNS_vorticity/w_"*string(Int(round(n/freq-1)))*".csv"
             wback = readdlm(file_input, ',', Float64) 
             wnf[:,:] = P*(complex.(wback[1:end-1,1:end-1],0.0))
             break
