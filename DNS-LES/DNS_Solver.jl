@@ -666,7 +666,7 @@ function main()
 
     jc      = zeros(nxc+1,nyc+1)
     jcoarse = zeros(nxc+1,nyc+1)
-
+    
     #%%
     # set the initial condition based on the problem selected
     if (ipr == 1)
