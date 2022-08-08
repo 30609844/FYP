@@ -8,5 +8,6 @@
 19	    !ich; Check for the file
 3	    !ipr; [1]TGV, [2]VM, [3]Decay 
 128	    !NXC=NYC, coarse resolution
+3	    !Dealiasing algorithm
 0	    !ichkp; [0]t=0, [1]checkpoint
 350	    !istart; last saved file (starting point)

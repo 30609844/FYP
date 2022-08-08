@@ -15,11 +15,13 @@ using Printf
 println(string(Threads.nthreads())*" THREADS")
 using FFTW
 FFTW.set_num_threads(Threads.nthreads())
-using Plots, DelimitedFiles
+using Plots, LaTeXStrings
+using Plots.PlotMeasures
+using DelimitedFiles
 using CUDA
 gr()
 
-#%%
+#%% Exact solution to Taylor-Green Vortex in 2D
 function exact_tgv(nx,ny,t,re)
     
     
@@ -45,7 +47,8 @@ function exact_tgv(nx,ny,t,re)
 
     return ue
 end
-#%%
+
+#%% 2D Taylor-Green Vortex initial condition
 function tgv_2D_ic(nx,ny)
     
     
@@ -69,7 +72,8 @@ function tgv_2D_ic(nx,ny)
     
     return w
 end
-#%%
+
+#%% 2D Vortex Merger initial condition
 function vm_ic(nx,ny)
     
     
@@ -101,28 +105,8 @@ function vm_ic(nx,ny)
 
     return w
 end
-#%%
-function pbc(nx,ny,u)
-    
-    
-    # assign periodic boundary condition in physical space
-    
-    # Inputs
-    # ------
-    # nx,ny : number of grid points in x and y direction
-    # u : solution field
-    
-    # Output
-    # ------
-    # u : solution field with periodic boundary condition applied
-        
-    
-    u[:,end] = u[:,1]
-    u[end,:] = u[1,:]
-    u[end,end] = u[1,1]
-end
-#%%
-# set initial condition for decay of turbulence problem
+
+#%% Initial condition for 2D DHIT
 function decay_ic(nx,ny,dx,dy,iP)
     
     
@@ -155,38 +139,33 @@ function decay_ic(nx,ny,dx,dy,iP)
     kx[1] = epsilon
     ky[1] = epsilon
     
-    ksi = 2.0*pi*rand(Int(nx/2+1), Int(ny/2+1))
-    eta = 2.0*pi*rand(Int(nx/2+1), Int(ny/2+1))
-    # ksi = [2.62022653e+00 4.52593227e+00 7.18638172e-04;1.89961158e+00 9.22094457e-01 5.80180502e-01;1.17030742e+00 2.17122208e+00 2.49296356e+00]
-    # eta = [3.38548539 2.63387681 4.3053611;1.28461137 5.51737457 0.17208132;4.21267161 2.6220034  3.51035172]
+    ξ = 2.0*pi*rand(Int(nx/2+1), Int(ny/2+1))
+    η = 2.0*pi*rand(Int(nx/2+1), Int(ny/2+1))
+
+    ind = falses(Int(nx/2+1), Int(ny/2+1))
+    ind[2:Int(nx/2),2:Int(ny/2)] .= true
+
     phase = zeros(Complex{Float64},nx,ny)
-    wf = zeros(Complex{Float64},nx,ny)
     
-    phase[2:Int(nx/2),2:Int(ny/2)]          = complex.(cos.(ksi[2:Int(nx/2),2:Int(ny/2)] +
-                                            eta[2:Int(nx/2),2:Int(ny/2)]), 
-                                            sin.(ksi[2:Int(nx/2),2:Int(ny/2)] +
-                                            eta[2:Int(nx/2),2:Int(ny/2)]))
+    phase[2:Int(nx/2),2:Int(ny/2)]          = complex.(cos.(ξ[ind] + η[ind]), 
+                                                        sin.(ξ[ind] + η[ind]))
 
-    phase[end:-1:Int(nx/2)+2,2:Int(ny/2)]   = complex.(cos.(-ksi[2:Int(nx/2),2:Int(ny/2)] +
-                                            eta[2:Int(nx/2),2:Int(ny/2)]), 
-                                            sin.(-ksi[2:Int(nx/2),2:Int(ny/2)] +
-                                            eta[2:Int(nx/2),2:Int(ny/2)]))
+    phase[end:-1:Int(nx/2)+2,2:Int(ny/2)]   = complex.(cos.(-ξ[ind] + η[ind]), 
+                                                        sin.(-ξ[ind] + η[ind]))
 
-    phase[2:Int(nx/2),end:-1:Int(ny/2)+2]   = complex.(cos.(ksi[2:Int(nx/2),2:Int(ny/2)] -
-                                            eta[2:Int(nx/2),2:Int(ny/2)]), 
-                                            sin.(ksi[2:Int(nx/2),2:Int(ny/2)] -
-                                            eta[2:Int(nx/2),2:Int(ny/2)]))
+    phase[2:Int(nx/2),end:-1:Int(ny/2)+2]   = complex.(cos.(ξ[ind] - η[ind]), 
+                                                        sin.(ξ[ind] - η[ind]))
 
-    phase[end:-1:Int(nx/2)+2,end:-1:Int(ny/2)+2]    = complex.(cos.(-ksi[2:Int(nx/2),2:Int(ny/2)] -
-                                                    eta[2:Int(nx/2),2:Int(ny/2)]), 
-                                                    sin.(-ksi[2:Int(nx/2),2:Int(ny/2)] -
-                                                    eta[2:Int(nx/2),2:Int(ny/2)]))
+    phase[end:-1:Int(nx/2)+2,end:-1:Int(ny/2)+2]    = complex.(cos.(-ξ[ind] - η[ind]), 
+                                                                sin.(-ξ[ind] - η[ind]))
 
     k0 = 10.0
     c = 4.0/(3.0*sqrt(pi)*(k0^5))           
     
     kk = @. sqrt((kx^2)' + ky^2)
     es = @. c*(kk^4)*exp(-(kk/k0)^2)
+
+    wf = zeros(Complex{Float64},nx,ny)
     wf = @. sqrt((kk*es/pi)) * phase*(nx*ny)
             
     ut = real(iP*wf) 
@@ -199,7 +178,8 @@ function decay_ic(nx,ny,dx,dy,iP)
     
     return w
 end
-#%%
+
+#%% Inverse Fourier transform from freq domain
 function wave2phy(nx,ny,uf,iP)
     
     
@@ -223,20 +203,21 @@ function wave2phy(nx,ny,uf,iP)
     # periodic BC
     u[:,end] = u[:,1]
     u[end,:] = u[1,:]
-    
+    u[end,end] = u[1,1]
+
     return u
 end
-#%%
-# compute the energy spectrum numerically
-function energy_spectrum(nx,ny,w,P)
+
+#%% compute the energy spectrum numerically
+function energy_spectrum(w,k2,P)
     
     
     # Computation of energy spectrum and maximum wavenumber from vorticity field
     
     # Inputs
     # ------
-    # nx,ny : number of grid points in x and y direction
     # w : vorticity field in physical spce (including periodic boundaries)
+    # kk : 2D wavenumber
     # P : FFT matrix
     
     # Output
@@ -245,45 +226,30 @@ function energy_spectrum(nx,ny,w,P)
     # n : maximum wavenumber
     
     
-    epsilon = 1.0e-6
-
-    kx = Array{Float64}(undef,nx)
-    ky = Array{Float64}(undef,ny)
-    
-    kx[1:Int(nx/2)] = 2*pi/(Float64(nx)*dx)*Float64.(range(0,Int(nx/2)-1,step=1))
-    kx[Int(nx/2)+1:nx] = 2*pi/(Float64(nx)*dx)*Float64.(range(-Int(nx/2),-1,step=1))
-
-    ky[1:ny] = kx[1:ny]
-    
-    kx[1] = epsilon
-    ky[1] = epsilon
-
-    # kx, ky = np.meshgrid(kx, ky, indexing='ij')
-    
-    wf = P*w[1:end-1,1:end-1]
+    wf = P*(w[1:end-1,1:end-1])
     
     es = Array{Float64}(undef,nx,ny)
     
-    kk = @. sqrt((kx^2)' + ky^2)
+    kk = @. sqrt(k2)
     es = @. pi*((abs(wf)/(nx*ny))^2)/kk
-    # es = c*(kk.^4).*exp.(-(kk/k0).^2)
     n = Int(round(sqrt(nx^2 + ny^2)/2.0))-1
     
     en = zeros(n+1)
+    ind = falses(nx-1,ny-1)
     enind = falses(nx,ny)
     for k in 1:n
         en[k+1] = 0.0
         ic = 0
-        ind = @. (kk[2:end,2:end]>(k-0.5)) & (kk[2:end,2:end]<(k+0.5))
+        ind[:,:] = @. (kk[2:end,2:end]>(k-0.5)) & (kk[2:end,2:end]<(k+0.5))
         ic = length(kk[2:end,2:end][ind])
         enind[2:end,2:end] = ind
         en[k+1] = sum(es[enind])/ic
     end
     return en, n
 end
-#%%
-# fast poisson solver using second-order central difference scheme
-function fps(nx,ny,dx,dy,k2,f,iP)
+
+#%% Fast Poisson solver using FFT
+function fps(nx,ny,k2,f,iP)
     
     
     # FFT based fast poisson solver 
@@ -292,7 +258,7 @@ function fps(nx,ny,dx,dy,k2,f,iP)
     # ------
     # nx,ny : number of grid points in x and y direction
     # dx,dy : grid spacing in x and y direction
-    # k2 : absolute wavenumber over 2D domain
+    # k2 : absolute squared wavenumber over 2D domain
     # f : right hand side of poisson equation in frequency domain (excluding periodic boundaries)
     # iP : IFFT matrix
     
@@ -304,16 +270,18 @@ function fps(nx,ny,dx,dy,k2,f,iP)
     u = zeros(nx+1,ny+1)
        
     # the denominator is based on the scheme used for discrtetizing the Poisson equation
-    soln = f./(-k2)
+    soln = @. f/k2
     
     # compute the inverse fourier transform
     u[1:nx,1:ny] = real(iP*soln)
-    pbc(nx,ny,u)
+    u[:,end] = u[:,1]
+    u[end,:] = u[1,:]
+    u[end,end] = u[1,1]
     
     return u
 end
 
-#%%
+#%% Coarsening
 function coarsen(nx,ny,nxc,nyc,uf) 
     
     
@@ -340,13 +308,35 @@ function coarsen(nx,ny,nxc,nyc,uf)
     ufc = ufc*(nxc*nyc)/(nx*ny)
     
     return ufc
-end
-       
-#%%
-function nonlineardealiased(nx,ny,kx,ky,k2,wf,iP,rP)   
+end 
+
+#%% Gaussian filter
+function filter_gauss(grid_ratio,k2,uf) 
+
+    # coarsen the data along with the size of the data 
+    
+    # Inputs
+    # ------
+    # grid_ratio : ratio of DNS/LES grid sizes
+    # k2 : absolute squared wavenumber over 2D domain
+    # uf : solution field on fine grid in frequency domain (excluding periodic boundaries)
+    
+    # Output
+    # ------
+    # uf_filtered : filtered solution in frequency domain (excluding periodic boundaries)
+    
+    G = @. exp(-(1/6)*k2*(grid_ratio)^2) # taken from Y. Guan, A. Chattopadhyay, A. Subel et al
+    
+    uf_filtered = @. G*uf
+    
+    return uf_filtered
+end 
+
+#%% Compute the Jacobian with dealiasing 
+function nonlineardealiased(nx,ny,kx,ky,k2,wf,iP,rP,opt)   
     
     
-    # compute the Jacobian with 3/2 dealiasing 
+    # Compute the Jacobian with dealiasing (Default 3/2)
     
     # Inputs
     # ------
@@ -356,77 +346,118 @@ function nonlineardealiased(nx,ny,kx,ky,k2,wf,iP,rP)
     # wf : vorticity field in frequency domain (excluding periodic boundaries)
     # iP : IFFT matrix
     # rP2 : FFT matrix with real coeffs
+    # opt : Method of dealiasing (1 for 3/2 padding, 2 for FT, 3 for FS)
     
     # Output
     # ------
     # jf : jacobian in frequency domain (excluding periodic boundaries)
     #      (d(psi)/dy*d(omega)/dx - d(psi)/dx*d(omega)/dy)
-    
+
+
     
     j1f = @. -1.0im*kx*wf/k2
     j2f = @. 1.0im*ky*wf
     j3f = @. -1.0im*ky*wf/k2
     j4f = @. 1.0im*kx*wf
-    
-    nxe = Int(nx*2)
-    nye = Int(ny*2)
+    if opt == 3
+        # FS dealiasing
+        α = 36; m = 36
 
-    j1f_padded = zeros(Complex{Float64},nxe,nye)
-    j2f_padded = zeros(Complex{Float64},nxe,nye)
-    j3f_padded = zeros(Complex{Float64},nxe,nye)
-    j4f_padded = zeros(Complex{Float64},nxe,nye)
-    
-    j1f_padded[1:Int(nx/2),1:Int(ny/2)]                     = j1f[1:Int(nx/2),1:Int(ny/2)]
-    j1f_padded[Int(nxe-nx/2)+1:end,1:Int(ny/2)]             = j1f[Int(nx/2)+1:end,1:Int(ny/2)]    
-    j1f_padded[1:Int(nx/2),Int(nye-ny/2)+1:end]             = j1f[1:Int(nx/2),Int(ny/2)+1:end]    
-    j1f_padded[Int(nxe-nx/2)+1:end,Int(nye-ny/2)+1:end]     = j1f[Int(nx/2)+1:end,Int(ny/2)+1:end] 
-    
-    j2f_padded[1:Int(nx/2),1:Int(ny/2)]                     = j2f[1:Int(nx/2),1:Int(ny/2)]
-    j2f_padded[Int(nxe-nx/2)+1:end,1:Int(ny/2)]             = j2f[Int(nx/2)+1:end,1:Int(ny/2)]    
-    j2f_padded[1:Int(nx/2),Int(nye-ny/2)+1:end]             = j2f[1:Int(nx/2),Int(ny/2)+1:end]    
-    j2f_padded[Int(nxe-nx/2)+1:end,Int(nye-ny/2)+1:end]     = j2f[Int(nx/2)+1:end,Int(ny/2)+1:end] 
-    
-    j3f_padded[1:Int(nx/2),1:Int(ny/2)]                     = j3f[1:Int(nx/2),1:Int(ny/2)]
-    j3f_padded[Int(nxe-nx/2)+1:end,1:Int(ny/2)]             = j3f[Int(nx/2)+1:end,1:Int(ny/2)]    
-    j3f_padded[1:Int(nx/2),Int(nye-ny/2)+1:end]             = j3f[1:Int(nx/2),Int(ny/2)+1:end]    
-    j3f_padded[Int(nxe-nx/2)+1:end,Int(nye-ny/2)+1:end]     = j3f[Int(nx/2)+1:end,Int(ny/2)+1:end] 
-    
-    j4f_padded[1:Int(nx/2),1:Int(ny/2)]                     = j4f[1:Int(nx/2),1:Int(ny/2)]
-    j4f_padded[Int(nxe-nx/2)+1:end,1:Int(ny/2)]             = j4f[Int(nx/2)+1:end,1:Int(ny/2)]    
-    j4f_padded[1:Int(nx/2),Int(nye-ny/2)+1:end]             = j4f[1:Int(nx/2),Int(ny/2)+1:end]    
-    j4f_padded[Int(nxe-nx/2)+1:end,Int(nye-ny/2)+1:end]     = j4f[Int(nx/2)+1:end,Int(ny/2)+1:end] 
-    
-    j1f_padded = j1f_padded*(nxe*nye)/(nx*ny)
-    j2f_padded = j2f_padded*(nxe*nye)/(nx*ny)
-    j3f_padded = j3f_padded*(nxe*nye)/(nx*ny)
-    j4f_padded = j4f_padded*(nxe*nye)/(nx*ny)
-    
-    j1 = real(iP*j1f_padded)
-    j2 = real(iP*j2f_padded)
-    j3 = real(iP*j3f_padded)
-    j4 = real(iP*j4f_padded)
-    
-    jacp = @. j1*j2 - j3*j4
+        dealias = @. (
+            (exp(-α*(2*abs(kx)/nd)^m))
+            *
+            (exp(-α*(2*abs(ky)/nd)^m))
+        )
+        j1 = real(iP*j1f)
+        j2 = real(iP*j2f)
+        j3 = real(iP*j3f)
+        j4 = real(iP*j4f)
+        
+        jac = @. j1*j2 - j3*j4
+        
+        jf = P*jac
+        jf .*= dealias
+        return jf
+    elseif opt == 2
+        # FT dealiasing
+        k_max_dealias = 2.0/3.0 * (nx/2 + 1)
+        dealias = (
+            (abs.(kx) .< k_max_dealias)
+            .*
+            (abs.(ky) .< k_max_dealias)
+        )
+        j1 = real(iP*j1f)
+        j2 = real(iP*j2f)
+        j3 = real(iP*j3f)
+        j4 = real(iP*j4f)
+        
+        jac = @. j1*j2 - j3*j4
+        
+        jf = P*jac
+        jf .*= dealias
+        return jf
+    else
+        nxe = Int(nx*2)
+        nye = Int(ny*2)
 
-    jacpf = rP*jacp
+        j1f_padded = zeros(Complex{Float64},nxe,nye)
+        j2f_padded = zeros(Complex{Float64},nxe,nye)
+        j3f_padded = zeros(Complex{Float64},nxe,nye)
+        j4f_padded = zeros(Complex{Float64},nxe,nye)
+        
+        j1f_padded[1:Int(nx/2),1:Int(ny/2)]                     = j1f[1:Int(nx/2),1:Int(ny/2)]
+        j1f_padded[Int(nxe-nx/2)+1:end,1:Int(ny/2)]             = j1f[Int(nx/2)+1:end,1:Int(ny/2)]    
+        j1f_padded[1:Int(nx/2),Int(nye-ny/2)+1:end]             = j1f[1:Int(nx/2),Int(ny/2)+1:end]    
+        j1f_padded[Int(nxe-nx/2)+1:end,Int(nye-ny/2)+1:end]     = j1f[Int(nx/2)+1:end,Int(ny/2)+1:end] 
+        
+        j2f_padded[1:Int(nx/2),1:Int(ny/2)]                     = j2f[1:Int(nx/2),1:Int(ny/2)]
+        j2f_padded[Int(nxe-nx/2)+1:end,1:Int(ny/2)]             = j2f[Int(nx/2)+1:end,1:Int(ny/2)]    
+        j2f_padded[1:Int(nx/2),Int(nye-ny/2)+1:end]             = j2f[1:Int(nx/2),Int(ny/2)+1:end]    
+        j2f_padded[Int(nxe-nx/2)+1:end,Int(nye-ny/2)+1:end]     = j2f[Int(nx/2)+1:end,Int(ny/2)+1:end] 
+        
+        j3f_padded[1:Int(nx/2),1:Int(ny/2)]                     = j3f[1:Int(nx/2),1:Int(ny/2)]
+        j3f_padded[Int(nxe-nx/2)+1:end,1:Int(ny/2)]             = j3f[Int(nx/2)+1:end,1:Int(ny/2)]    
+        j3f_padded[1:Int(nx/2),Int(nye-ny/2)+1:end]             = j3f[1:Int(nx/2),Int(ny/2)+1:end]    
+        j3f_padded[Int(nxe-nx/2)+1:end,Int(nye-ny/2)+1:end]     = j3f[Int(nx/2)+1:end,Int(ny/2)+1:end] 
+        
+        j4f_padded[1:Int(nx/2),1:Int(ny/2)]                     = j4f[1:Int(nx/2),1:Int(ny/2)]
+        j4f_padded[Int(nxe-nx/2)+1:end,1:Int(ny/2)]             = j4f[Int(nx/2)+1:end,1:Int(ny/2)]    
+        j4f_padded[1:Int(nx/2),Int(nye-ny/2)+1:end]             = j4f[1:Int(nx/2),Int(ny/2)+1:end]    
+        j4f_padded[Int(nxe-nx/2)+1:end,Int(nye-ny/2)+1:end]     = j4f[Int(nx/2)+1:end,Int(ny/2)+1:end] 
+        
+        j1f_padded = j1f_padded*(nxe*nye)/(nx*ny)
+        j2f_padded = j2f_padded*(nxe*nye)/(nx*ny)
+        j3f_padded = j3f_padded*(nxe*nye)/(nx*ny)
+        j4f_padded = j4f_padded*(nxe*nye)/(nx*ny)
+        
+        j1 = real(iP*j1f_padded)
+        j2 = real(iP*j2f_padded)
+        j3 = real(iP*j3f_padded)
+        j4 = real(iP*j4f_padded)
+        
+        jacp = @. j1*j2 - j3*j4
 
-    
-    jf = zeros(Complex{Float64},nx,ny)
-    
-    jf[1:Int(nx/2),1:Int(ny/2)]             = jacpf[1:Int(nx/2),1:Int(ny/2)]
-    jf[Int(nx/2)+1:end,1:Int(ny/2)]         = conj.(jacpf[Int(nx/2)+1:-1:2,[1;end:-1:end-Int(nx/2)+2]])    
-    jf[1:Int(nx/2),Int(ny/2)+1:end]         = jacpf[1:Int(nx/2),Int(nye-ny/2)+1:end]    
-    jf[Int(nx/2)+1:end,Int(ny/2)+1:end]     = conj.(jacpf[Int(nx/2)+1:-1:2,Int(nx/2)+1:-1:2])
-    
-    jf = jf*(nx*ny)/(nxe*nye)
-    
-    return jf
+        jacpf = rP*jacp
+
+        
+        jf = zeros(Complex{Float64},nx,ny)
+        
+        jf[1:Int(nx/2),1:Int(ny/2)]             = jacpf[1:Int(nx/2),1:Int(ny/2)]
+        jf[Int(nx/2)+1:end,1:Int(ny/2)]         = conj.(jacpf[Int(nx/2)+1:-1:2,[1;end:-1:end-Int(nx/2)+2]])    
+        jf[1:Int(nx/2),Int(ny/2)+1:end]         = jacpf[1:Int(nx/2),Int(nye-ny/2)+1:end]    
+        jf[Int(nx/2)+1:end,Int(ny/2)+1:end]     = conj.(jacpf[Int(nx/2)+1:-1:2,Int(nx/2)+1:-1:2])
+        
+        jf = jf*(nx*ny)/(nxe*nye)
+        
+        return jf
+    end
 end
-#%%
+
+#%% Compute the Jacobian without dealiasing
 function nonlinear(nx,ny,kx,ky,k2,wf,iP,P) 
     
     
-    # compute the Jacobian without dealiasing 
+    # Compute the Jacobian without dealiasing 
     
     # Inputs
     # ------
@@ -460,6 +491,7 @@ function nonlinear(nx,ny,kx,ky,k2,wf,iP,P)
     return jf
 end
 
+#%%
 function w_plot(nx,ny,dt,w0,w,folder,n)
     # Plots the vorticity field
 
@@ -485,7 +517,7 @@ function w_plot(nx,ny,dt,w0,w,folder,n)
     savefig(filename)
 end
 
-#%% coarsening
+#%%
 function write_data(jc,jcoarse,sgs,w,s,n,folder)
     
     
@@ -523,8 +555,8 @@ function write_data(jc,jcoarse,sgs,w,s,n,folder)
     filename = "spectral/"*folder*"/05_streamfunction/s_"*string(n)*".csv"
     writedlm(filename,s,',')
 end
-#%% 
 
+#%% 
 function main()
     # read input file
     l1 = []
@@ -542,10 +574,9 @@ function main()
     ich = Int64(l1[8])      #ich; Check for the file
     ipr = Int64(l1[9])      #ipr; [1]TGV, [2]VM, [3]Decay 
     ndc = Int64(l1[10])     #NXC=NYC, coarse resolution
-    ichkp = Int64(l1[11])   #ichkp; [0]t=0, [1]checkpoint
-    ichkp = 1   #ichkp; [0]t=0, [1]checkpoint
-    istart = Int64(l1[12])  #istart; last saved file (starting point)
-    istart = 275  #5500 istart; last saved file (starting point)
+    opt = Int64(l1[11])     #Dealiasing algorithm:[1] 3/2 padding, [2] FT, [3], FS
+    ichkp = Int64(l1[12])   #ichkp; [0]t=0, [1]checkpoint
+    istart = Int64(l1[13])  #istart; last saved file (starting point)
 
     freq = Int(nt/ns)
 
@@ -558,6 +589,8 @@ function main()
 
     nxc = ndc
     nyc = ndc
+
+    grid_ratio = nd÷ndc
 
     lx = 2.0*pi
     ly = 2.0*pi
@@ -577,6 +610,8 @@ function main()
 
     k2 = @. kx^2 + ky^2
     k2[1,1] = 1.0e-12
+
+
 
     P    = plan_fft(rand(nx,ny))
     Pc   = plan_fft(rand(nxc,nyc))
@@ -625,7 +660,7 @@ function main()
     folder = "data_"*string(nx)*"_v2"
     if ichkp == 0
         wnf[:,:] = P*(complex.(w0[1:end-1,1:end-1],0.0)) # fourier space forward
-        s[:,:] = fps(nx,ny,dx,dy,k2,-wnf,iP)
+        s[:,:] = fps(nx,ny,k2,wnf,iP)
         w[:,:] = wave2phy(nx,ny,wnf,iP)
                
         kxc = fftfreq(nxc,nxc)
@@ -640,14 +675,14 @@ function main()
         j[:,:] = wave2phy(nx,ny,jnf,iP) # jacobian for fine solution field
             
          # coarsened(jacobian field)
-        jfc[:,:] = coarsen(nx,ny,nxc,nyc,jnf) # coarsened(jacobian field) in frequency domain
-        jc[:,:] = wave2phy(nxc,nyc,jfc,iPc) # coarsened(jacobian field) physical space
+        jfc[:,:] = coarsen(nx,ny,nxc,nyc,jnf) # coarsened(jacobian DNS field) in frequency domain
+        jc[:,:] = wave2phy(nxc,nyc,jfc,iPc) # coarsened(jacobian DNS field) physical space
                    
         wfc[:,:] = coarsen(nx,ny,nxc,nyc,wnf)       
         jcoarsef[:,:] = nonlineardealiased(nxc,nyc,kxc,kyc,k2c,wfc,iP2c,rP2c) # jacobian(coarsened solution field) in frequency domain
         jcoarse[:,:] = wave2phy(nxc,nyc,jcoarsef,iPc) # jacobian(coarsened solution field) physical space
                 
-        sgs = jc - jcoarse
+        sgs = jc - jcoarse # THIS SGS IS SUBTRACTED ON THE RHS
         write_data(jc,jcoarse,sgs,w,s,0,folder)
     elseif ichkp == 1
         println(istart)
@@ -710,7 +745,7 @@ function main()
             # wnf = P*(complex.(wback[1:end-1,1:end-1],0.0))
         end
         if (mod(n,freq) == 0)
-            s[:,:] = fps(nx,ny,dx,dy,k2,-wnf,iP)
+            s[:,:] = fps(nx,ny,k2,wnf,iP)
             w[:,:] = wave2phy(nx,ny,wnf,iP)
                
             kxc = fftfreq(nxc,nxc)
@@ -736,9 +771,9 @@ function main()
             write_data(jc,jcoarse,sgs,w,s,Int(round(n/freq)),folder)
             @printf("n: %3i, t = %6.4f %4ix%4i\n",n,t,nx,ny)
             # println("n: $n, t = $(round(t+tchkp; digits=4)) $(size(wnf)[1])x$(size(wnf)[2])")
-        end
-        if (mod(n,50*freq) == 0)
-            w_plot(nx,ny,dt,w0,w,folder,n)
+            if (mod(n,50*freq) == 0)
+                w_plot(nx,ny,dt,w0,w,folder,n)
+            end
         end
     end
     w = wave2phy(nx,ny,wnf,P) # final vorticity field in physical space            
@@ -749,8 +784,8 @@ function main()
     #%%
     # compute the exact, initial and final energy spectrum for DHIT problem
     if (ipr == 3)
-        en, n = energy_spectrum(nx,ny,w,P)
-        en0, n = energy_spectrum(nx,ny,w0,P)
+        en, n = energy_spectrum(w,k2,P)
+        en0, n = energy_spectrum(w0,k2,P)
         k = LinRange(1,n,n)
         
         k0 = 10.0
@@ -764,35 +799,26 @@ function main()
     #%%
     # energy spectrum plot for DHIT problem
     if (ipr == 3)
-        # fig, ax = plt.subplots()
-        # fig.set_size_inches(7,5)
+    
+        line = @. 100*k^(-3.0)
         
-        line = 100*k^(-3.0)
-        
-        # ax.loglog(k,ese[:],'k', lw = 2, label='Exact')
-        # ax.loglog(k,en0[1:],'r', ls = '--', lw = 2, label='$t = 0.0$')
-        # ax.loglog(k,en[1:], 'b', lw = 2, label = '$t = '+string(dt*nt)+'$')
-        # #ax.loglog(k,en_a[1:], 'y', lw = 2, label = '$t = '+string(dt*nt)+'$')
-        # ax.loglog(k,line, 'g--', lw = 2, label = 'k^-3')
-        
-        # plt.xlabel('$K$')
-        # plt.ylabel('$E(K)$')
-        # plt.legend(loc=0)
-        # plt.ylim(1e-16,1e-0)
-        
-
+        scalefontsizes(2)
         p1 = plot(k,ese,
             lw=2,
             linecolor = :green,
             xscale = :log,
             yscale = :log,
-            xlabel = "k",
-            ylabel = "E(k)",
+            xlabel = L"k",
+            ylabel = L"E(k)",
+            yticks = exp10.(range(-16,stop=0,length=9)),
+            xticks = exp10.(range(-0,stop=3,length=4)),
             ylims = (1e-16,1e-0),
             label="Exact",
             title = "TKE spectrum",
             legend = :bottomleft,
-            size=(900,900))
+            left_margin = [10mm 0mm],
+            bottom_margin = [10mm 10mm],
+            size=(1400,900))
             
         p1 = plot!(k,en0[2:end],
             lw=2,
@@ -800,7 +826,7 @@ function main()
             linecolor = :red,
             xscale = :log,
             yscale = :log,
-            label="t = 0.0")
+            label=L"t = 0.0")
 
         p1 = plot!(k,en[2:end],
             lw=2,
@@ -808,7 +834,7 @@ function main()
             linecolor = :blue,
             xscale = :log,
             yscale = :log,
-            label="t = 0.0"*string(dt*nt))
+            label=latexstring("t = "*string(dt*nt)))
 
         p1 = plot!(k,line,
             lw=2,
@@ -816,8 +842,10 @@ function main()
             linecolor = :black,
             xscale = :log,
             yscale = :log,
-            label="k^-3")
-        plot(p1)
+            label=false
+            )
+        annotate!([1e2],[1e-3],L"k^{-3}",font(16))
+        
         savefig("spectral/es_spectral.png")    
 
     end
