@@ -295,7 +295,7 @@ function coarsen(nx,ny,nxc,nyc,uf)
     
     # Output
     # ------
-    # ufc : caorsened solution in frequency domain (excluding periodic boundaries)
+    # ufc : coarsened solution in frequency domain (excluding periodic boundaries)
     
     
     ufc = zeros(Complex{Float64},nxc,nyc)
@@ -311,13 +311,13 @@ function coarsen(nx,ny,nxc,nyc,uf)
 end 
 
 #%% Gaussian filter
-function filter_gauss(grid_ratio,k2,uf) 
+function filter_gauss(dxc,k2,uf) 
 
     # coarsen the data along with the size of the data 
     
     # Inputs
     # ------
-    # grid_ratio : ratio of DNS/LES grid sizes
+    # dxc : filter size
     # k2 : absolute squared wavenumber over 2D domain
     # uf : solution field on fine grid in frequency domain (excluding periodic boundaries)
     
@@ -325,7 +325,7 @@ function filter_gauss(grid_ratio,k2,uf)
     # ------
     # uf_filtered : filtered solution in frequency domain (excluding periodic boundaries)
     
-    G = @. exp(-(1/6)*k2*(grid_ratio)^2) # taken from Y. Guan, A. Chattopadhyay, A. Subel et al
+    G = @. exp(-(1/6)*k2*(dxc)^2) # taken from Y. Guan, A. Chattopadhyay, A. Subel et al
     
     uf_filtered = @. G*uf
     
@@ -333,7 +333,7 @@ function filter_gauss(grid_ratio,k2,uf)
 end 
 
 #%% Compute the Jacobian with dealiasing 
-function nonlineardealiased(nx,ny,kx,ky,k2,wf,P,iP,rP,opt)   
+function nonlineardealiased(nx,ny,kx,ky,k2,wf,iP,P,iP2,rP2,opt)   
     
     
     # Compute the Jacobian with dealiasing (Default 3/2)
@@ -344,8 +344,9 @@ function nonlineardealiased(nx,ny,kx,ky,k2,wf,P,iP,rP,opt)
     # kx,ky : wavenumber in x and y direction
     # k2 : absolute wave number over 2D domain
     # wf : vorticity field in frequency domain (excluding periodic boundaries)
-    # iP : IFFT matrix
-    # rP : FFT matrix with real coeffs
+    # P : FFT matrix
+    # iP2 : IFFT matrix for 2x grid
+    # rP2 : FFT matrix with real coeffs for 2x grid
     # opt : Method of dealiasing (1 for 3/2 padding, 2 for FT, 3 for FS)
     
     # Output
@@ -362,9 +363,9 @@ function nonlineardealiased(nx,ny,kx,ky,k2,wf,P,iP,rP,opt)
         α = 36; m = 36
 
         dealias = @. (
-            (exp(-α*(2*abs(kx)/nd)^m))
+            (exp(-α*(2*abs(kx)/nx)^m))
             *
-            (exp(-α*(2*abs(ky)/nd)^m))
+            (exp(-α*(2*abs(ky)/nx)^m))
         )
         j1 = real(iP*j1f)
         j2 = real(iP*j2f)
@@ -428,14 +429,14 @@ function nonlineardealiased(nx,ny,kx,ky,k2,wf,P,iP,rP,opt)
         j3f_padded = j3f_padded*(nxe*nye)/(nx*ny)
         j4f_padded = j4f_padded*(nxe*nye)/(nx*ny)
         
-        j1 = real(iP*j1f_padded)
-        j2 = real(iP*j2f_padded)
-        j3 = real(iP*j3f_padded)
-        j4 = real(iP*j4f_padded)
+        j1 = real(iP2*j1f_padded)
+        j2 = real(iP2*j2f_padded)
+        j3 = real(iP2*j3f_padded)
+        j4 = real(iP2*j4f_padded)
         
         jacp = @. j1*j2 - j3*j4
 
-        jacpf = rP*jacp
+        jacpf = rP2*jacp
         
         jf = zeros(Complex{Float64},nx,ny)
         
@@ -515,7 +516,7 @@ function w_plot(nx,ny,dt,w0,w,folder,n)
 end
 
 #%%
-function write_data(jc,jcoarse,sgs,w,s,n,folder)
+function write_data(jc,jcoarse,sgs,w,s,w_LES,s_LES,n,folder)
     
     
     # write the data to .csv files for post-processing
@@ -529,7 +530,9 @@ function write_data(jc,jcoarse,sgs,w,s,n,folder)
     # jcoarse : Jacobian computed for coarsed solution field
     # sgs : subgrid scale term
     # w : vorticity in physical space for fine grid (including periodic boundaries)
+    # w_LES : filtered vorticity (including periodic boundaries)
     # s : streamfunction in physical space for fine grid (including periodic boundaries)
+    # s_LES : filtered streamfunction (including periodic boundaries)
     
 
     if !isdir("spectral/"*folder)
@@ -537,8 +540,10 @@ function write_data(jc,jcoarse,sgs,w,s,n,folder)
         mkdir("spectral/"*folder*"/01_coarsened_jacobian_field")
         mkdir("spectral/"*folder*"/02_jacobian_coarsened_field")
         mkdir("spectral/"*folder*"/03_subgrid_scale_term")
-        mkdir("spectral/"*folder*"/04_vorticity")
-        mkdir("spectral/"*folder*"/05_streamfunction")
+        mkdir("spectral/"*folder*"/04_DNS_vorticity")
+        mkdir("spectral/"*folder*"/05_LES_vorticity")
+        mkdir("spectral/"*folder*"/06_DNS_streamfunction")
+        mkdir("spectral/"*folder*"/07_LES_streamfunction")
     end
 
     filename = "spectral/"*folder*"/01_coarsened_jacobian_field/J_fourier_"*string(n)*".csv"  
@@ -547,10 +552,14 @@ function write_data(jc,jcoarse,sgs,w,s,n,folder)
     writedlm(filename,jcoarse,',')
     filename = "spectral/"*folder*"/03_subgrid_scale_term/sgs_"*string(n)*".csv"
     writedlm(filename,sgs,',')
-    filename = "spectral/"*folder*"/04_vorticity/w_"*string(n)*".csv"
+    filename = "spectral/"*folder*"/04_DNS_vorticity/w_"*string(n)*".csv"
     writedlm(filename,w,',')
-    filename = "spectral/"*folder*"/05_streamfunction/s_"*string(n)*".csv"
+    filename = "spectral/"*folder*"/05_LES_vorticity/w_"*string(n)*".csv"
+    writedlm(filename,w_LES,',')
+    filename = "spectral/"*folder*"/06_DNS_streamfunction/s_"*string(n)*".csv"
     writedlm(filename,s,',')
+    filename = "spectral/"*folder*"/07_LES_streamfunction/s_"*string(n)*".csv"
+    writedlm(filename,s_LES,',')
 end
 
 #%% 
@@ -576,7 +585,19 @@ function main()
     istart = Int64(l1[13])  #istart; last saved file (starting point)
 
     freq = Int(nt/ns)
-
+    @printf("DNS RESOLUTION: %ix%i\n",nd,nd)
+    @printf("LES RESOLUTION: %ix%i\n",ndc,ndc)
+    @printf("REYNOLDS NUMBER = %.0f\n",re)
+    @printf("STORING %i FILES\n",ns)
+    @printf("WILL RUN FOR %i ITERATIONS UNTIL t = %.1f\n",nt,nt*dt)
+    if opt == 3
+        @printf("FOURIER SMOOTHING SELECTED AS DEALIASING METHOD\n")
+    elseif opt == 2
+        @printf("FOURIER TRUNCATION SELECTED AS DEALIASING METHOD\n")
+    else
+        @printf("3/2 PADDING SELECTED AS DEALIASING METHOD\n")
+    end
+    
     if (ich != 19)
         print("Check input.txt file")
     end
@@ -586,8 +607,6 @@ function main()
 
     nxc = ndc
     nyc = ndc
-
-    grid_ratio = nd÷ndc
 
     lx = 2.0*pi
     ly = 2.0*pi
@@ -625,13 +644,21 @@ function main()
     w1f = zeros(Complex{Float64},nx,ny)
     w2f = zeros(Complex{Float64},nx,ny)
 
+    wfc = zeros(Complex{Float64},nxc,nyc)
+    jfc = zeros(Complex{Float64},nxc,nyc)
+
+    w   = zeros(nx+1,ny+1)
+    w0  = zeros(nx+1,ny+1)
+
     jnf = zeros(Complex{Float64},nx,ny)
     j1f = zeros(Complex{Float64},nx,ny)
     j2f = zeros(Complex{Float64},nx,ny)
     
     s = zeros(nx+1,ny+1)
     j = zeros(nx+1,ny+1)    
-    w = zeros(nx+1,ny+1)    #lol
+    w = zeros(nx+1,ny+1)    
+    s_LES = zeros(nxc+1,nyc+1)
+    w_LES = zeros(nxc+1,nyc+1)
 
     jfc         = zeros(Complex{Float64},nxc,nyc)
     jcoarsef    = zeros(Complex{Float64},nxc,nyc)
@@ -643,21 +670,17 @@ function main()
     #%%
     # set the initial condition based on the problem selected
     if (ipr == 1)
-        w0 = tgv_2D_ic(nx,ny) # taylor-green vortex problem
+        w0[:,:] = tgv_2D_ic(nx,ny) # taylor-green vortex problem
     elseif (ipr == 2)
-        w0 = vm_ic(nx,ny) # vortex-merger problem
+        w0[:,:] = vm_ic(nx,ny) # vortex-merger problem
     elseif (ipr == 3)
-        w0 = decay_ic(nx,ny,dx,dy,iP) # decaying homegeneous isotropic turbulence problem
+        w0[:,:] = decay_ic(nx,ny,dx,dy,iP) # decaying homegeneous isotropic turbulence problem
     end
     #%%  
     ifile = 0
     tchkp = ichkp*freq*istart*dt
-    folder = "data_"*string(nx)*"_v2"
+    folder = "data_"*string(nx)*"_re_"*string(Int(re))*"_v2"
     if ichkp == 0
-        wnf[:,:] = P*(complex.(w0[1:end-1,1:end-1],0.0)) # fourier space forward
-        s[:,:] = fps(nx,ny,k2,wnf,iP)
-        w[:,:] = wave2phy(nx,ny,wnf,iP)
-               
         kxc = fftfreq(nxc,nxc)
         kyc = fftfreq(nyc,nyc)
         kxc = reshape(kxc,(nxc,1))
@@ -665,26 +688,34 @@ function main()
                 
         k2c = @. kxc^2 + kyc^2
         k2c[1,1] = 1.0e-12
-                 
-        jnf[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,wnf,P,iP2,rP2,opt)
+
+        wnf[:,:] = P*(complex.(w0[1:end-1,1:end-1],0.0)) # fourier space forward
+        s[:,:] = fps(nx,ny,k2,wnf,iP)
+        w[:,:] = wave2phy(nx,ny,wnf,iP)
+
+        jnf[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,wnf,iP,P,iP2,rP2,opt)
         j[:,:] = wave2phy(nx,ny,jnf,iP) # jacobian for fine solution field
+
+        wfc[:,:] = coarsen(nx,ny,nxc,nyc,filter_gauss(dxc,k2,wnf)) 
+        s_LES[:,:] = fps(nxc,nyc,k2c,wfc,iPc)   # LES grid streamfunction
+        w_LES[:,:] = wave2phy(nxc,nyc,wfc,iPc)  # LES grid vorticity
             
-         # coarsened(jacobian field)
-        jfc[:,:] = coarsen(nx,ny,nxc,nyc,jnf) # coarsened(jacobian DNS field) in frequency domain
-        jc[:,:] = wave2phy(nxc,nyc,jfc,iPc) # coarsened(jacobian DNS field) physical space
-                   
-        wfc[:,:] = coarsen(nx,ny,nxc,nyc,wnf)       
-        jcoarsef[:,:] = nonlineardealiased(nxc,nyc,kxc,kyc,k2c,wfc,Pc,iP2c,rP2c,opt) # jacobian(coarsened solution field) in frequency domain
+        # coarsened(jacobian field)
+        jfc[:,:] = coarsen(nx,ny,nxc,nyc,filter_gauss(dxc,k2,jnf))  # coarsened(jacobian DNS field) in frequency domain
+        jc[:,:] = wave2phy(nxc,nyc,jfc,iPc)                         # coarsened(jacobian DNS field) in physical space
+        
+        # jacobian(coarsened filtered solution field)      
+        jcoarsef[:,:] = nonlineardealiased(nxc,nyc,kxc,kyc,k2c,wfc,iPc,Pc,iP2c,rP2c,opt) # jacobian(coarsened solution field) in frequency domain
         jcoarse[:,:] = wave2phy(nxc,nyc,jcoarsef,iPc) # jacobian(coarsened solution field) physical space
                 
         sgs = jc - jcoarse # THIS SGS IS SUBTRACTED ON THE RHS
-        write_data(jc,jcoarse,sgs,w,s,0,folder)
+        write_data(jc,jcoarse,sgs,w,s,w_LES,s_LES,0,folder)
     elseif ichkp == 1
         println(istart)
         file_input = "spectral/"*folder*"/04_vorticity/w_"*string(0)*".csv"
-        w0 = readdlm(file_input, ',', Float64)
+        w0[:,:] = readdlm(file_input, ',', Float64)
         file_input = "spectral/"*folder*"/04_vorticity/w_"*string(istart)*".csv"
-        w = readdlm(file_input, ',', Float64)
+        w[:,:] = readdlm(file_input, ',', Float64)
     end
     #%%
 
@@ -711,17 +742,17 @@ function main()
         looptime = time()
         t = n*dt
         # 1st step
-        jnf[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,wnf,P,iP2,rP2,opt)    
+        jnf[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,wnf,iP,P,iP2,rP2,opt)    
         w1f[:,:] = @. ((1.0 - d1)/(1.0 + d1))*wnf + (g1*dt*jnf)/(1.0 + d1)
         w1f[1,1] = 0.0
 
         # 2nd step
-        j1f[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,w1f,P,iP2,rP2,opt)
+        j1f[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,w1f,iP,P,iP2,rP2,opt)
         w2f[:,:] = @. ((1.0 - d2)/(1.0 + d2))*w1f + (r2*dt*jnf + g2*dt*j1f)/(1.0 + d2)
         w2f[1,1] = 0.0
 
         # 3rd step
-        j2f[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,w2f,P,iP2,rP2,opt)
+        j2f[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,w2f,iP,P,iP2,rP2,opt)
         wnf[:,:] = @. ((1.0 - d3)/(1.0 + d3))*w2f + (r3*dt*j1f + g3*dt*j2f)/(1.0 + d3)
         wnf[1,1] = 0.0
         a = time() - looptime
@@ -740,30 +771,27 @@ function main()
             # wnf = P*(complex.(wback[1:end-1,1:end-1],0.0))
         end
         if (mod(n,freq) == 0)
+            wnf[:,:] = P*(complex.(w0[1:end-1,1:end-1],0.0)) # fourier space forward
             s[:,:] = fps(nx,ny,k2,wnf,iP)
             w[:,:] = wave2phy(nx,ny,wnf,iP)
-               
-            kxc = fftfreq(nxc,nxc)
-            kyc = fftfreq(nyc,nyc)
-            kxc = reshape(kxc,(nxc,1))
-            kyc = reshape(kyc,(1,nyc))
-                
-            k2c = @. kxc^2 + kyc^2
-            k2c[1,1] = 1.0e-12
-                 
-            jnf[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,wnf,iP2,rP2)
+    
+            jnf[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,wnf,iP,P,iP2,rP2,opt)
             j[:,:] = wave2phy(nx,ny,jnf,iP) # jacobian for fine solution field
-            
-            # coarsened(jacobian field)
-            jfc[:,:] = coarsen(nx,ny,nxc,nyc,jnf) # coarsened(jacobian field) in frequency domain
-            jc[:,:] = wave2phy(nxc,nyc,jfc,iPc) # coarsened(jacobian field) physical space
-                   
-            wfc[:,:] = coarsen(nx,ny,nxc,nyc,wnf)       
-            jcoarsef[:,:] = nonlineardealiased(nxc,nyc,kxc,kyc,k2c,wfc,iP2c,rP2c) # jacobian(coarsened solution field) in frequency domain
-            jcoarse[:,:] = wave2phy(nxc,nyc,jcoarsef,iPc) # jacobian(coarsened solution field) physical space
+    
+            wfc[:,:] = coarsen(nx,ny,nxc,nyc,filter_gauss(dxc,k2,wnf)) 
+            s_LES[:,:] = fps(nxc,nyc,k2c,wfc,iPc)   # LES grid streamfunction
+            w_LES[:,:] = wave2phy(nxc,nyc,wfc,iPc)  # LES grid vorticity
                 
-            sgs = jc - jcoarse
-            write_data(jc,jcoarse,sgs,w,s,Int(round(n/freq)),folder)
+            # coarsened(jacobian field)
+            jfc[:,:] = coarsen(nx,ny,nxc,nyc,filter_gauss(dxc,k2,jnf))  # coarsened(jacobian DNS field) in frequency domain
+            jc[:,:] = wave2phy(nxc,nyc,jfc,iPc)                         # coarsened(jacobian DNS field) in physical space
+            
+            # jacobian(coarsened filtered solution field)      
+            jcoarsef[:,:] = nonlineardealiased(nxc,nyc,kxc,kyc,k2c,wfc,iPc,Pc,iP2c,rP2c,opt) # jacobian(coarsened solution field) in frequency domain
+            jcoarse[:,:] = wave2phy(nxc,nyc,jcoarsef,iPc) # jacobian(coarsened solution field) physical space
+                    
+            sgs = jc - jcoarse # THIS SGS IS SUBTRACTED ON THE RHS
+            write_data(jc,jcoarse,sgs,w,s,w_LES,s_LES,0,folder)
             @printf("n: %3i, t = %6.4f %4ix%4i\n",n,t,nx,ny)
             # println("n: $n, t = $(round(t+tchkp; digits=4)) $(size(wnf)[1])x$(size(wnf)[2])")
             if (mod(n,50*freq) == 0)
