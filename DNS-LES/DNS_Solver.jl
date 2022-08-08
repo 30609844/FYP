@@ -815,7 +815,7 @@ function main()
         c = @. 4.0/(3.0*sqrt(pi)*(k0^5))           
         ese = @. c*(k^4)*exp(-(k/k0)^2)
         
-        writedlm("spectral/energy_spectral_"*string(nd)*"_"*string(Int(re))*".csv", en, ',')
+        writedlm("spectral/"*folder*"energy_spectral_"*string(nd)*"_"*string(Int(re))*".csv", en, ',')
     end
     #%%
 
@@ -869,7 +869,7 @@ function main()
             )
         annotate!([1e2],[1e-3],L"k^{-3}",font(16))
         
-        savefig("spectral/es_spectral.png")    
+        savefig("spectral/"*folder*"es_spectral.png")    
 
     end
     # #%%
