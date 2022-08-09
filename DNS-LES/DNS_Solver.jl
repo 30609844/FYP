@@ -311,13 +311,13 @@ function coarsen(nx,ny,nxc,nyc,uf)
 end 
 
 #%% Gaussian filter
-function filter_gauss(dxc,k2,uf) 
+function filter_gauss(Δ,k2,uf) 
 
     # coarsen the data along with the size of the data 
     
     # Inputs
     # ------
-    # dxc : filter size
+    # Δ : filter width
     # k2 : absolute squared wavenumber over 2D domain
     # uf : solution field on fine grid in frequency domain (excluding periodic boundaries)
     
@@ -325,7 +325,7 @@ function filter_gauss(dxc,k2,uf)
     # ------
     # uf_filtered : filtered solution in frequency domain (excluding periodic boundaries)
     
-    G = @. exp(-(1/6)*k2*(dxc)^2) # taken from Y. Guan, A. Chattopadhyay, A. Subel et al
+    G = @. exp(-(1/24)*k2*Δ^2) # taken from Y. Guan, A. Chattopadhyay, A. Subel et al
     
     uf_filtered = @. G*uf
     
@@ -365,7 +365,7 @@ function nonlineardealiased(nx,ny,kx,ky,k2,wf,iP,P,iP2,rP2,opt)
         dealias = @. (
             (exp(-α*(2*abs(kx)/nx)^m))
             *
-            (exp(-α*(2*abs(ky)/nx)^m))
+            (exp(-α*(2*abs(ky)/ny)^m))
         )
         j1 = real(iP*j1f)
         j2 = real(iP*j2f)
@@ -627,6 +627,17 @@ function main()
     k2 = @. kx^2 + ky^2
     k2[1,1] = 1.0e-12
 
+    kxc = fftfreq(nxc,nxc)
+    kyc = fftfreq(nyc,nyc)
+    kxc = reshape(kxc,(nxc,1))
+    kyc = reshape(kyc,(1,nyc))
+            
+    k2c = @. kxc^2 + kyc^2
+    k2c[1,1] = 1.0e-12
+
+    kc = ndc/2
+    Δ = pi/kc
+
     P    = plan_fft(rand(nx,ny))
     Pc   = plan_fft(rand(nxc,nyc))
     P2   = plan_fft(rand(2*nx,2*ny))
@@ -678,14 +689,6 @@ function main()
     tchkp = ichkp*freq*istart*dt
     folder = "data_"*string(nx)*"_re_"*string(Int(re))*"_v2"
     if ichkp == 0
-        kxc = fftfreq(nxc,nxc)
-        kyc = fftfreq(nyc,nyc)
-        kxc = reshape(kxc,(nxc,1))
-        kyc = reshape(kyc,(1,nyc))
-                
-        k2c = @. kxc^2 + kyc^2
-        k2c[1,1] = 1.0e-12
-
         wnf[:,:] = P*(complex.(w0[1:end-1,1:end-1],0.0)) # fourier space forward
         s[:,:] = fps(nx,ny,k2,wnf,iP)
         w[:,:] = wave2phy(nx,ny,wnf,iP)
@@ -693,12 +696,12 @@ function main()
         jnf[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,wnf,iP,P,iP2,rP2,opt)
         j[:,:] = wave2phy(nx,ny,jnf,iP) # jacobian for fine solution field
 
-        wfc[:,:] = coarsen(nx,ny,nxc,nyc,filter_gauss(dxc,k2,wnf)) 
+        wfc[:,:] = coarsen(nx,ny,nxc,nyc,filter_gauss(Δ,k2,wnf)) 
         s_LES[:,:] = fps(nxc,nyc,k2c,wfc,iPc)   # LES grid streamfunction
         w_LES[:,:] = wave2phy(nxc,nyc,wfc,iPc)  # LES grid vorticity
             
         # coarsened(jacobian field)
-        jfc[:,:] = coarsen(nx,ny,nxc,nyc,filter_gauss(dxc,k2,jnf))  # coarsened(jacobian DNS field) in frequency domain
+        jfc[:,:] = coarsen(nx,ny,nxc,nyc,filter_gauss(Δ,k2,jnf))  # coarsened(jacobian DNS field) in frequency domain
         jc[:,:] = wave2phy(nxc,nyc,jfc,iPc)                         # coarsened(jacobian DNS field) in physical space
         
         # jacobian(coarsened filtered solution field)      
@@ -774,12 +777,12 @@ function main()
             jnf[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,wnf,iP,P,iP2,rP2,opt)
             j[:,:] = wave2phy(nx,ny,jnf,iP) # jacobian for fine solution field
     
-            wfc[:,:] = coarsen(nx,ny,nxc,nyc,filter_gauss(dxc,k2,wnf)) 
+            wfc[:,:] = coarsen(nx,ny,nxc,nyc,filter_gauss(Δ,k2,wnf)) 
             s_LES[:,:] = fps(nxc,nyc,k2c,wfc,iPc)   # LES grid streamfunction
             w_LES[:,:] = wave2phy(nxc,nyc,wfc,iPc)  # LES grid vorticity
                 
             # coarsened(jacobian field)
-            jfc[:,:] = coarsen(nx,ny,nxc,nyc,filter_gauss(dxc,k2,jnf))  # coarsened(jacobian DNS field) in frequency domain
+            jfc[:,:] = coarsen(nx,ny,nxc,nyc,filter_gauss(Δ,k2,jnf))  # coarsened(jacobian DNS field) in frequency domain
             jc[:,:] = wave2phy(nxc,nyc,jfc,iPc)                         # coarsened(jacobian DNS field) in physical space
             
             # jacobian(coarsened filtered solution field)      
@@ -886,7 +889,7 @@ function main()
     # savefig("vorticity_3D1.png", dpi=30)
 end
 
-main()
+# main()
 
 
 
