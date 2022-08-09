@@ -771,7 +771,6 @@ function main()
             # wnf = P*(complex.(wback[1:end-1,1:end-1],0.0))
         end
         if (mod(n,freq) == 0)
-            wnf[:,:] = P*(complex.(w0[1:end-1,1:end-1],0.0)) # fourier space forward
             s[:,:] = fps(nx,ny,k2,wnf,iP)
             w[:,:] = wave2phy(nx,ny,wnf,iP)
     
