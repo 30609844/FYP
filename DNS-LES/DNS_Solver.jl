@@ -889,7 +889,7 @@ function main()
     # savefig("vorticity_3D1.png", dpi=30)
 end
 
-# main()
+main()
 
 
 
