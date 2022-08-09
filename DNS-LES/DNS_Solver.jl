@@ -644,8 +644,9 @@ function main()
     w1f = zeros(Complex{Float64},nx,ny)
     w2f = zeros(Complex{Float64},nx,ny)
 
-    wfc = zeros(Complex{Float64},nxc,nyc)
-    jfc = zeros(Complex{Float64},nxc,nyc)
+    wfc         = zeros(Complex{Float64},nxc,nyc)
+    jfc         = zeros(Complex{Float64},nxc,nyc)
+    jcoarsef    = zeros(Complex{Float64},nxc,nyc)
 
     w   = zeros(nx+1,ny+1)
     w0  = zeros(nx+1,ny+1)
@@ -659,10 +660,6 @@ function main()
     w = zeros(nx+1,ny+1)    
     s_LES = zeros(nxc+1,nyc+1)
     w_LES = zeros(nxc+1,nyc+1)
-
-    jfc         = zeros(Complex{Float64},nxc,nyc)
-    jcoarsef    = zeros(Complex{Float64},nxc,nyc)
-    wfc         = zeros(Complex{Float64},nxc,nyc)
 
     jc      = zeros(nxc+1,nyc+1)
     jcoarse = zeros(nxc+1,nyc+1)
@@ -790,7 +787,7 @@ function main()
             jcoarse[:,:] = wave2phy(nxc,nyc,jcoarsef,iPc) # jacobian(coarsened solution field) physical space
                     
             sgs = jc - jcoarse # THIS SGS IS SUBTRACTED ON THE RHS
-            write_data(jc,jcoarse,sgs,w,s,w_LES,s_LES,0,folder)
+            write_data(jc,jcoarse,sgs,w,s,w_LES,s_LES,n,folder)
             @printf("n: %3i, t = %6.4f %4ix%4i\n",n,t,nx,ny)
             # println("n: $n, t = $(round(t+tchkp; digits=4)) $(size(wnf)[1])x$(size(wnf)[2])")
             if (mod(n,50*freq) == 0)
