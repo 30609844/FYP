@@ -790,7 +790,7 @@ function main()
             jcoarse[:,:] = wave2phy(nxc,nyc,jcoarsef,iPc) # jacobian(coarsened solution field) physical space
                     
             sgs = jc - jcoarse # THIS SGS IS SUBTRACTED ON THE RHS
-            write_data(jc,jcoarse,sgs,w,s,w_LES,s_LES,n,folder)
+            write_data(jc,jcoarse,sgs,w,s,w_LES,s_LES,Int(n/freq),folder)
             @printf("n: %3i, t = %6.4f %4ix%4i\n",n,t,nx,ny)
             # println("n: $n, t = $(round(t+tchkp; digits=4)) $(size(wnf)[1])x$(size(wnf)[2])")
             if (mod(n,50*freq) == 0)
