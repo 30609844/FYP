@@ -10,4 +10,4 @@
 256	    !NXC=NYC, coarse resolution
 1	    !Dealiasing algorithm:[1]3/2 padding, [2]FT, [3],FS
 0	    !ichkp; [0]t=0, [1]checkpoint
-350	    !istart; last saved file (starting point)
+32	    !istart; last saved file (starting point)

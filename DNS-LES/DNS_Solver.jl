@@ -19,6 +19,7 @@ using Plots, LaTeXStrings
 using Plots.PlotMeasures
 using DelimitedFiles
 using CUDA
+CUDA.device()
 gr()
 
 #%% Exact solution to Taylor-Green Vortex in 2D
