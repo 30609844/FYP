@@ -396,8 +396,8 @@ function nonlineardealiased(nx,ny,kx,ky,k2,wf,iP,P,iP2,rP2,opt)
         jf .*= dealias
         return jf
     else
-        nxe = Int(nx*2)
-        nye = Int(ny*2)
+        nxe = Int(3*nx/2)
+        nye = Int(3*ny/2)
 
         j1f_padded = zeros(Complex{Float64},nxe,nye)
         j2f_padded = zeros(Complex{Float64},nxe,nye)
@@ -730,7 +730,7 @@ function main()
     rPc  = plan_rfft(rand(nxc,nyc))
     rP2  = plan_rfft(rand(Int(3*nx/2),Int(3*ny/2)))
     rP2c = plan_rfft(rand(Int(3*nxc/2),Int(3*nyc/2)))
-    
+
     wnf = zeros(Complex{Float64},nx,ny)
     w1f = zeros(Complex{Float64},nx,ny)
     w2f = zeros(Complex{Float64},nx,ny)
