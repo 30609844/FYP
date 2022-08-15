@@ -451,6 +451,86 @@ function nonlineardealiased(nx,ny,kx,ky,k2,wf,iP,P,iP2,rP2,opt)
     end
 end
 
+#%% Compute the Jacobian with dealiasing 
+function nonlineardealiased_implicit(nx,ny,kx,ky,k2,wf,iP,P,iP2,rP2,opt)   
+    
+    
+    # Compute the Jacobian with dealiasing (Default 3/2)
+    
+    # Inputs
+    # ------
+    # nx,ny : number of grid points in x and y direction on fine grid
+    # kx,ky : wavenumber in x and y direction
+    # k2 : absolute wave number over 2D domain
+    # wf : vorticity field in frequency domain (excluding periodic boundaries)
+    # P : FFT matrix
+    # iP2 : IFFT matrix for 2x grid
+    # rP2 : FFT matrix with real coeffs for 2x grid
+    # opt : Method of dealiasing (1 for 3/2 padding, 2 for FT, 3 for FS)
+    
+    # Output
+    # ------
+    # jf : jacobian in frequency domain (excluding periodic boundaries)
+    #      (d(psi)/dy*d(omega)/dx - d(psi)/dx*d(omega)/dy)
+    
+    j1f = @. -1.0im*kx*wf/k2
+    j2f = @. 1.0im*ky*wf
+    j3f = @. -1.0im*ky*wf/k2
+    j4f = @. 1.0im*kx*wf
+    nxe = Int(3*nx/2)
+    nye = Int(3*ny/2)
+
+    j1f_padded = zeros(Complex{Float64},nxe,nye)
+    j2f_padded = zeros(Complex{Float64},nxe,nye)
+    j3f_padded = zeros(Complex{Float64},nxe,nye)
+    j4f_padded = zeros(Complex{Float64},nxe,nye)
+    
+    j1f_padded[1:Int(nx/2),1:Int(ny/2)]                     = j1f[1:Int(nx/2),1:Int(ny/2)]
+    j1f_padded[Int(nxe-nx/2)+1:end,1:Int(ny/2)]             = j1f[Int(nx/2)+1:end,1:Int(ny/2)]    
+    j1f_padded[1:Int(nx/2),Int(nye-ny/2)+1:end]             = j1f[1:Int(nx/2),Int(ny/2)+1:end]    
+    j1f_padded[Int(nxe-nx/2)+1:end,Int(nye-ny/2)+1:end]     = j1f[Int(nx/2)+1:end,Int(ny/2)+1:end] 
+    
+    j2f_padded[1:Int(nx/2),1:Int(ny/2)]                     = j2f[1:Int(nx/2),1:Int(ny/2)]
+    j2f_padded[Int(nxe-nx/2)+1:end,1:Int(ny/2)]             = j2f[Int(nx/2)+1:end,1:Int(ny/2)]    
+    j2f_padded[1:Int(nx/2),Int(nye-ny/2)+1:end]             = j2f[1:Int(nx/2),Int(ny/2)+1:end]    
+    j2f_padded[Int(nxe-nx/2)+1:end,Int(nye-ny/2)+1:end]     = j2f[Int(nx/2)+1:end,Int(ny/2)+1:end] 
+    
+    j3f_padded[1:Int(nx/2),1:Int(ny/2)]                     = j3f[1:Int(nx/2),1:Int(ny/2)]
+    j3f_padded[Int(nxe-nx/2)+1:end,1:Int(ny/2)]             = j3f[Int(nx/2)+1:end,1:Int(ny/2)]    
+    j3f_padded[1:Int(nx/2),Int(nye-ny/2)+1:end]             = j3f[1:Int(nx/2),Int(ny/2)+1:end]    
+    j3f_padded[Int(nxe-nx/2)+1:end,Int(nye-ny/2)+1:end]     = j3f[Int(nx/2)+1:end,Int(ny/2)+1:end] 
+    
+    j4f_padded[1:Int(nx/2),1:Int(ny/2)]                     = j4f[1:Int(nx/2),1:Int(ny/2)]
+    j4f_padded[Int(nxe-nx/2)+1:end,1:Int(ny/2)]             = j4f[Int(nx/2)+1:end,1:Int(ny/2)]    
+    j4f_padded[1:Int(nx/2),Int(nye-ny/2)+1:end]             = j4f[1:Int(nx/2),Int(ny/2)+1:end]    
+    j4f_padded[Int(nxe-nx/2)+1:end,Int(nye-ny/2)+1:end]     = j4f[Int(nx/2)+1:end,Int(ny/2)+1:end] 
+    
+    j1f_padded = j1f_padded*(nxe*nye)/(nx*ny)
+    j2f_padded = j2f_padded*(nxe*nye)/(nx*ny)
+    j3f_padded = j3f_padded*(nxe*nye)/(nx*ny)
+    j4f_padded = j4f_padded*(nxe*nye)/(nx*ny)
+    
+    j1 = real(iP2*j1f_padded)
+    j2 = real(iP2*j2f_padded)
+    j3 = real(iP2*j3f_padded)
+    j4 = real(iP2*j4f_padded)
+    
+    jacp = @. j1*j2 - j3*j4
+
+    jacpf = rP2*jacp
+    
+    jf = zeros(Complex{Float64},nx,ny)
+    
+    jf[1:Int(nx/2),1:Int(ny/2)]             = jacpf[1:Int(nx/2),1:Int(ny/2)]
+    jf[Int(nx/2)+1:end,1:Int(ny/2)]         = conj.(jacpf[Int(nx/2)+1:-1:2,[1;end:-1:end-Int(nx/2)+2]])    
+    jf[1:Int(nx/2),Int(ny/2)+1:end]         = jacpf[1:Int(nx/2),Int(nye-ny/2)+1:end]    
+    jf[Int(nx/2)+1:end,Int(ny/2)+1:end]     = conj.(jacpf[Int(nx/2)+1:-1:2,Int(nx/2)+1:-1:2])
+    
+    jf = jf*(nx*ny)/(nxe*nye)
+    
+    return jf
+end
+
 #%% Compute the Jacobian without dealiasing
 function nonlinear(nx,ny,kx,ky,k2,wf,iP,P) 
     
@@ -507,7 +587,7 @@ function w_plot(nx,ny,dt,w0,w,folder,n)
         clim=(minimum(w0),maximum(w0)),
         axis = nothing)
     c2 = heatmap(LinRange(0,2pi,nx+1),LinRange(0,2pi,ny+1),w,
-        title = "t = $(n*dt)",
+        title = "t = $(round(n*dt,digits=2))",
         clim=(minimum(w0),maximum(w0)),
         axis = nothing)
     filename = "spectral/"*folder*"/field_spectral_"*string(n)*".png"
@@ -588,7 +668,7 @@ function main()
     @printf("DNS RESOLUTION: %ix%i\n",nd,nd)
     @printf("LES RESOLUTION: %ix%i\n",ndc,ndc)
     @printf("REYNOLDS NUMBER = %.0f\n",re)
-    @printf("STORING %i FILES\n",ns)
+    @printf("STORING %i FILES PER VARIABLE\n",ns)
     @printf("WILL RUN FOR %i ITERATIONS UNTIL t = %.1f\n",nt,nt*dt)
     if opt == 3
         @printf("FOURIER SMOOTHING SELECTED AS DEALIASING METHOD\n")
@@ -640,17 +720,17 @@ function main()
 
     P    = plan_fft(rand(nx,ny))
     Pc   = plan_fft(rand(nxc,nyc))
-    P2   = plan_fft(rand(2*nx,2*ny))
-    P2c  = plan_fft(rand(2*nxc,2*nyc))
+    P2   = plan_fft(rand(Int(3*nx/2),Int(3*ny/2)))
+    P2c  = plan_fft(rand(Int(3*nxc/2),Int(3*nyc/2)))
     iP   = plan_ifft(rand(nx,ny))
     iPc  = plan_ifft(rand(nxc,nyc))
-    iP2  = plan_ifft(rand(2*nx,2*ny))
-    iP2c = plan_ifft(rand(2*nxc,2*nyc))
+    iP2  = plan_ifft(rand(Int(3*nx/2),Int(3*ny/2)))
+    iP2c = plan_ifft(rand(Int(3*nxc/2),Int(3*nyc/2)))
     rP   = plan_rfft(rand(nx,ny))
     rPc  = plan_rfft(rand(nxc,nyc))
-    rP2  = plan_rfft(rand(2*nx,2*ny))
-    rP2c = plan_rfft(rand(2*nxc,2*nyc))
-
+    rP2  = plan_rfft(rand(Int(3*nx/2),Int(3*ny/2)))
+    rP2c = plan_rfft(rand(Int(3*nxc/2),Int(3*nyc/2)))
+    
     wnf = zeros(Complex{Float64},nx,ny)
     w1f = zeros(Complex{Float64},nx,ny)
     w2f = zeros(Complex{Float64},nx,ny)
@@ -793,7 +873,7 @@ function main()
             write_data(jc,jcoarse,sgs,w,s,w_LES,s_LES,Int(n/freq),folder)
             @printf("n: %3i, t = %6.4f %4ix%4i\n",n,t,nx,ny)
             # println("n: $n, t = $(round(t+tchkp; digits=4)) $(size(wnf)[1])x$(size(wnf)[2])")
-            if (mod(n,50*freq) == 0)
+            if (mod(n,25*freq) == 0)
                 w_plot(nx,ny,dt,w0,w,folder,n)
             end
         end
