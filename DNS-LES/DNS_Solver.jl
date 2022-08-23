@@ -124,12 +124,12 @@ function decay_ic(nx,ny,dx,dy,iP)
     # w : initial condition for vorticity for DHIT problem
     
     
-    w = Array{Float64}(undef,nx+1,ny+1)
+    w = zeros(nx+1,ny+1)
     
     epsilon = 1.0e-6
     
-    kx = Array{Float64}(undef,nx)
-    ky = Array{Float64}(undef,ny)
+    kx = zeros(nx)
+    ky = zeros(ny)
     
     kx[1:Int(nx/2)] = 2*pi/(Float64(nx)*dx)*Float64.(range(0,Int(nx/2)-1,step=1))
     kx[Int(nx/2)+1:nx] = 2*pi/(Float64(nx)*dx)*Float64.(range(-Int(nx/2),-1,step=1))
@@ -198,7 +198,7 @@ function wave2phy(nx,ny,uf,iP)
     # u : solution in physical space (along with periodic boundaries)
     
     
-    u = Array{Float64}(undef,nx+1,ny+1)
+    u = zeros(nx+1,ny+1)
 
     u[1:nx,1:ny] = real(iP*uf)
     # periodic BC
@@ -218,7 +218,7 @@ function energy_spectrum(w,k2,P)
     # Inputs
     # ------
     # w : vorticity field in physical spce (including periodic boundaries)
-    # kk : 2D wavenumber
+    # k2 : 2D wavenumber Squared
     # P : FFT matrix
     
     # Output
@@ -228,8 +228,9 @@ function energy_spectrum(w,k2,P)
     
     
     wf = P*(w[1:end-1,1:end-1])
-    
-    es = Array{Float64}(undef,nx,ny)
+    nx = size(wf)[1]
+    ny = size(wf)[2]
+    es = zeros(nx,ny)
     
     kk = @. sqrt(k2)
     es = @. pi*((abs(wf)/(nx*ny))^2)/kk
@@ -452,8 +453,7 @@ function nonlineardealiased(nx,ny,kx,ky,k2,wf,iP,P,iP2,rP2,opt)
     end
 end
 
-#%% Compute the Jacobian with dealiasing 
-function nonlineardealiased_implicit(nx,ny,kx,ky,k2,wf,iP,P,iP2,rP2,opt)   
+function nonlineardealiased_GPU(nx,ny,kx,ky,k2,wf,iP,P,iP2,rP2,opt)   
     
     
     # Compute the Jacobian with dealiasing (Default 3/2)
@@ -478,6 +478,118 @@ function nonlineardealiased_implicit(nx,ny,kx,ky,k2,wf,iP,P,iP2,rP2,opt)
     j2f = @. 1.0im*ky*wf
     j3f = @. -1.0im*ky*wf/k2
     j4f = @. 1.0im*kx*wf
+    if opt == 3
+        # FS dealiasing
+        α = 36; m = 36
+
+        dealias = @. (
+            (exp(-α*(2*abs(kx)/nx)^m))
+            *
+            (exp(-α*(2*abs(ky)/ny)^m))
+        )
+        j1 = real(iP*j1f)
+        j2 = real(iP*j2f)
+        j3 = real(iP*j3f)
+        j4 = real(iP*j4f)
+        
+        jac = @. j1*j2 - j3*j4
+        
+        jf = P*jac
+        jf .*= dealias
+        return jf
+    elseif opt == 2
+        # FT dealiasing
+        k_max_dealias = 2.0/3.0 * (nx/2 + 1)
+        dealias = (
+            (abs.(kx) .< k_max_dealias)
+            .*
+            (abs.(ky) .< k_max_dealias)
+        )
+        j1 = real(iP*j1f)
+        j2 = real(iP*j2f)
+        j3 = real(iP*j3f)
+        j4 = real(iP*j4f)
+        
+        jac = @. j1*j2 - j3*j4
+        
+        jf = P*jac
+        jf .*= dealias
+        return jf
+    else
+        nxe = Int(3*nx/2)
+        nye = Int(3*ny/2)
+
+        j1f_padded = zeros(Complex{Float64},nxe,nye)
+        j2f_padded = zeros(Complex{Float64},nxe,nye)
+        j3f_padded = zeros(Complex{Float64},nxe,nye)
+        j4f_padded = zeros(Complex{Float64},nxe,nye)
+        
+        zero_pad = zeros(nxe-nx,nye-ny)
+
+        j1f_padded[1:Int(nx/2),:]           = hcat(j1f[1:Int(nx/2),1:Int(ny/2)],zero_pad,j1f[1:Int(nx/2),Int(ny/2)+1:end])
+        j1f_padded[Int(nxe-nx/2)+1:end,:]   = hcat(j1f[Int(nx/2)+1:end,1:Int(ny/2)],zero_pad,j1f[Int(nx/2)+1:end,Int(ny/2)+1:end])
+
+        j2f_padded[1:Int(nx/2),:]           = hcat(j2f[1:Int(nx/2),1:Int(ny/2)],zero_pad,j2f[1:Int(nx/2),Int(ny/2)+1:end])
+        j2f_padded[Int(nxe-nx/2)+1:end,:]   = hcat(j2f[Int(nx/2)+1:end,1:Int(ny/2)],zero_pad,j2f[Int(nx/2)+1:end,Int(ny/2)+1:end])
+
+        j3f_padded[1:Int(nx/2),:]           = hcat(j3f[1:Int(nx/2),1:Int(ny/2)],zero_pad,j3f[1:Int(nx/2),Int(ny/2)+1:end])
+        j3f_padded[Int(nxe-nx/2)+1:end,:]   = hcat(j3f[Int(nx/2)+1:end,1:Int(ny/2)],zero_pad,j3f[Int(nx/2)+1:end,Int(ny/2)+1:end])
+
+        j4f_padded[1:Int(nx/2),:]           = hcat(j4f[1:Int(nx/2),1:Int(ny/2)],zero_pad,j4f[1:Int(nx/2),Int(ny/2)+1:end])
+        j4f_padded[Int(nxe-nx/2)+1:end,:]   = hcat(j4f[Int(nx/2)+1:end,1:Int(ny/2)],zero_pad,j4f[Int(nx/2)+1:end,Int(ny/2)+1:end])
+
+        j1f_padded = j1f_padded*(nxe*nye)/(nx*ny)
+        j2f_padded = j2f_padded*(nxe*nye)/(nx*ny)
+        j3f_padded = j3f_padded*(nxe*nye)/(nx*ny)
+        j4f_padded = j4f_padded*(nxe*nye)/(nx*ny)
+        
+        j1 = real(iP2*j1f_padded)
+        j2 = real(iP2*j2f_padded)
+        j3 = real(iP2*j3f_padded)
+        j4 = real(iP2*j4f_padded)
+        
+        jacp = @. j1*j2 - j3*j4
+
+        jacpf = rP2*jacp
+        
+        jf = zeros(Complex{Float64},nx,ny)
+        
+        jf[1:Int(nx/2),1:Int(ny/2)]             = jacpf[1:Int(nx/2),1:Int(ny/2)]
+        jf[Int(nx/2)+1:end,1:Int(ny/2)]         = conj.(jacpf[Int(nx/2)+1:-1:2,[1;end:-1:end-Int(nx/2)+2]])    
+        jf[1:Int(nx/2),Int(ny/2)+1:end]         = jacpf[1:Int(nx/2),Int(nye-ny/2)+1:end]    
+        jf[Int(nx/2)+1:end,Int(ny/2)+1:end]     = conj.(jacpf[Int(nx/2)+1:-1:2,Int(nx/2)+1:-1:2])
+        
+        jf = jf*(nx*ny)/(nxe*nye)
+        
+        return jf
+    end
+end
+
+#%% Compute the Jacobian with dealiasing 
+function nonlineardealiased_implicit(nx,ny,kx,ky,k2,wf,P,iP2,rP2)   
+    
+    
+    # Compute the Jacobian with dealiasing (Default 3/2)
+    
+    # Inputs
+    # ------
+    # nx,ny : number of grid points in x and y direction on fine grid
+    # kx,ky : wavenumber in x and y direction
+    # k2 : absolute wave number over 2D domain
+    # wf : vorticity field in frequency domain (excluding periodic boundaries)
+    # P : FFT matrix
+    # iP2 : IFFT matrix for 2x grid
+    # rP2 : FFT matrix with real coeffs for 2x grid
+    
+    # Output
+    # ------
+    # jf : jacobian in frequency domain (excluding periodic boundaries)
+    #      (d(psi)/dy*d(omega)/dx - d(psi)/dx*d(omega)/dy)
+    
+    j1f = @. -1.0im*kx*wf/k2
+    j2f = @. 1.0im*ky*wf
+    j3f = @. -1.0im*ky*wf/k2
+    j4f = @. 1.0im*kx*wf
     nxe = Int(3*nx/2)
     nye = Int(3*ny/2)
 
@@ -486,25 +598,25 @@ function nonlineardealiased_implicit(nx,ny,kx,ky,k2,wf,iP,P,iP2,rP2,opt)
     j3f_padded = zeros(Complex{Float64},nxe,nye)
     j4f_padded = zeros(Complex{Float64},nxe,nye)
     
-    j1f_padded[1:Int(nx/2),1:Int(ny/2)]                     = j1f[1:Int(nx/2),1:Int(ny/2)]
-    j1f_padded[Int(nxe-nx/2)+1:end,1:Int(ny/2)]             = j1f[Int(nx/2)+1:end,1:Int(ny/2)]    
-    j1f_padded[1:Int(nx/2),Int(nye-ny/2)+1:end]             = j1f[1:Int(nx/2),Int(ny/2)+1:end]    
-    j1f_padded[Int(nxe-nx/2)+1:end,Int(nye-ny/2)+1:end]     = j1f[Int(nx/2)+1:end,Int(ny/2)+1:end] 
+    # j1f_padded[1:Int(nx/2),1:Int(ny/2)]                     = j1f[1:Int(nx/2),1:Int(ny/2)]
+    # j1f_padded[Int(nxe-nx/2)+1:end,1:Int(ny/2)]             = j1f[Int(nx/2)+1:end,1:Int(ny/2)]    
+    # j1f_padded[1:Int(nx/2),Int(nye-ny/2)+1:end]             = j1f[1:Int(nx/2),Int(ny/2)+1:end]    
+    # j1f_padded[Int(nxe-nx/2)+1:end,Int(nye-ny/2)+1:end]     = j1f[Int(nx/2)+1:end,Int(ny/2)+1:end] 
     
-    j2f_padded[1:Int(nx/2),1:Int(ny/2)]                     = j2f[1:Int(nx/2),1:Int(ny/2)]
-    j2f_padded[Int(nxe-nx/2)+1:end,1:Int(ny/2)]             = j2f[Int(nx/2)+1:end,1:Int(ny/2)]    
-    j2f_padded[1:Int(nx/2),Int(nye-ny/2)+1:end]             = j2f[1:Int(nx/2),Int(ny/2)+1:end]    
-    j2f_padded[Int(nxe-nx/2)+1:end,Int(nye-ny/2)+1:end]     = j2f[Int(nx/2)+1:end,Int(ny/2)+1:end] 
+    # j2f_padded[1:Int(nx/2),1:Int(ny/2)]                     = j2f[1:Int(nx/2),1:Int(ny/2)]
+    # j2f_padded[Int(nxe-nx/2)+1:end,1:Int(ny/2)]             = j2f[Int(nx/2)+1:end,1:Int(ny/2)]    
+    # j2f_padded[1:Int(nx/2),Int(nye-ny/2)+1:end]             = j2f[1:Int(nx/2),Int(ny/2)+1:end]    
+    # j2f_padded[Int(nxe-nx/2)+1:end,Int(nye-ny/2)+1:end]     = j2f[Int(nx/2)+1:end,Int(ny/2)+1:end] 
     
-    j3f_padded[1:Int(nx/2),1:Int(ny/2)]                     = j3f[1:Int(nx/2),1:Int(ny/2)]
-    j3f_padded[Int(nxe-nx/2)+1:end,1:Int(ny/2)]             = j3f[Int(nx/2)+1:end,1:Int(ny/2)]    
-    j3f_padded[1:Int(nx/2),Int(nye-ny/2)+1:end]             = j3f[1:Int(nx/2),Int(ny/2)+1:end]    
-    j3f_padded[Int(nxe-nx/2)+1:end,Int(nye-ny/2)+1:end]     = j3f[Int(nx/2)+1:end,Int(ny/2)+1:end] 
+    # j3f_padded[1:Int(nx/2),1:Int(ny/2)]                     = j3f[1:Int(nx/2),1:Int(ny/2)]
+    # j3f_padded[Int(nxe-nx/2)+1:end,1:Int(ny/2)]             = j3f[Int(nx/2)+1:end,1:Int(ny/2)]    
+    # j3f_padded[1:Int(nx/2),Int(nye-ny/2)+1:end]             = j3f[1:Int(nx/2),Int(ny/2)+1:end]    
+    # j3f_padded[Int(nxe-nx/2)+1:end,Int(nye-ny/2)+1:end]     = j3f[Int(nx/2)+1:end,Int(ny/2)+1:end] 
     
-    j4f_padded[1:Int(nx/2),1:Int(ny/2)]                     = j4f[1:Int(nx/2),1:Int(ny/2)]
-    j4f_padded[Int(nxe-nx/2)+1:end,1:Int(ny/2)]             = j4f[Int(nx/2)+1:end,1:Int(ny/2)]    
-    j4f_padded[1:Int(nx/2),Int(nye-ny/2)+1:end]             = j4f[1:Int(nx/2),Int(ny/2)+1:end]    
-    j4f_padded[Int(nxe-nx/2)+1:end,Int(nye-ny/2)+1:end]     = j4f[Int(nx/2)+1:end,Int(ny/2)+1:end] 
+    # j4f_padded[1:Int(nx/2),1:Int(ny/2)]                     = j4f[1:Int(nx/2),1:Int(ny/2)]
+    # j4f_padded[Int(nxe-nx/2)+1:end,1:Int(ny/2)]             = j4f[Int(nx/2)+1:end,1:Int(ny/2)]    
+    # j4f_padded[1:Int(nx/2),Int(nye-ny/2)+1:end]             = j4f[1:Int(nx/2),Int(ny/2)+1:end]    
+    # j4f_padded[Int(nxe-nx/2)+1:end,Int(nye-ny/2)+1:end]     = j4f[Int(nx/2)+1:end,Int(ny/2)+1:end] 
     
     j1f_padded = j1f_padded*(nxe*nye)/(nx*ny)
     j2f_padded = j2f_padded*(nxe*nye)/(nx*ny)
@@ -970,7 +1082,7 @@ function main()
     # savefig("vorticity_3D1.png", dpi=30)
 end
 
-main()
+# main()
 
 
 
