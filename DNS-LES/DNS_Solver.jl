@@ -829,7 +829,7 @@ function main()
     k2c[1,1] = 1.0e-12
 
     kc = ndc/2
-    Δ = pi/kc
+    Δ = 2pi/kc
 
     P    = plan_fft(rand(nx,ny))
     Pc   = plan_fft(rand(nxc,nyc))

@@ -846,7 +846,7 @@ function main()
     k2c[1,1] = 1.0e-12
 
     kc = ndc/2
-    Δ = pi/kc
+    Δ = 2pi/kc
 
     P    = plan_fft(rand(nx,ny))
     Pc   = plan_fft(rand(nxc,nyc))
@@ -893,21 +893,26 @@ function main()
     #%%
     file_input = "spectral/"*folder*"/04_DNS_vorticity/w_"*string(0)*".csv"
     w0[:,:] = readdlm(file_input, ',', Float64)
-    for i in 1:16
-        file_input = "spectral/"*folder*"/04_DNS_vorticity/w_"*string(Int(i*2500/freq))*".csv"
-        w[:,:] = readdlm(file_input, ',', Float64)
-        w_plot(nx,ny,dt,w0,w,folder,i*2500)
-    end
+    # for i in 1:16
+    #     file_input = "spectral/"*folder*"/04_DNS_vorticity/w_"*string(Int(i*2500/freq))*".csv"
+    #     w[:,:] = readdlm(file_input, ',', Float64)
+    #     w_plot(nx,ny,dt,w0,w,folder,i*2500)
+    # end
     file_input = "spectral/"*folder*"/04_DNS_vorticity/w_"*string(ns)*".csv"
     w[:,:] = readdlm(file_input, ',', Float64)
+    file_input = "spectral/"*folder*"/05_LES_vorticity/w_"*string(ns)*".csv"
+    w_LES[:,:] = readdlm(file_input, ',', Float64)
     wnf[:,:] = P*(complex.(w[1:end-1,1:end-1],0.0)) # fourier space forward
     #%%
     # compute the exact, initial and final energy spectrum for DHIT problem
     if (ipr == 3)
         en, n = energy_spectrum(w,k2,P)
         en0, n = energy_spectrum(w0,k2,P)
+        en_filt, nc = energy_spectrum(w_LES,k2c,Pc)
+
         k = LinRange(1,n,n)
-        
+        kc = LinRange(1,nc,nc)
+
         k0 = 10.0
         c = @. 4.0/(3.0*sqrt(pi)*(k0^5))           
         ese = @. c*(k^4)*exp(-(k/k0)^2)
@@ -955,6 +960,30 @@ function main()
             xscale = :log,
             yscale = :log,
             label=latexstring("t = "*string(dt*nt)))
+
+        p1 = plot!(kc,en_filt[2:end],
+            lw=2,
+            ls = :dash,
+            linecolor = :cyan,
+            xscale = :log,
+            yscale = :log,
+            label=latexstring("Filtered t = "*string(dt*nt)))
+
+        p1 = plot!(k,exp.(-(1/24)*k.^2*Δ^2),
+            lw=1,
+            ls = :dot,
+            linecolor = :red,
+            xscale = :log,
+            yscale = :log,
+            label=latexstring("Gaussian Filter"))
+
+        p1 = plot!((ndc/2)*[1,1],[1e-16,1],
+            lw=1,
+            ls = :dot,
+            linecolor = :black,
+            xscale = :log,
+            yscale = :log,
+            label=latexstring("k_c"))
 
         p1 = plot!(k,line,
             lw=2,
