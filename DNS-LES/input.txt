@@ -2,7 +2,7 @@
 40000	!NT, number of time step
 3.2e4	!Re, Reynolds number 
 1.0e-4	!dt; time step
-400	    !nf;number of files to store
+8000	    !nf;number of files to store
 1	    !isolver:[1]ikeda, [2]arakawa
 1	    !isc; [0]don't write-screen, [1]write-screen
 19	    !ich; Check for the file

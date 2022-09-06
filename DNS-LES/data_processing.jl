@@ -15,29 +15,6 @@ using DelimitedFiles
 
 CUDA.allowscalar(false)
 ## THE Π TERMS ARE SIMPLY jcoarse - jc
-##
-# Created 31/07/22 
-
-# @author: Kevin Liu
-
-# DNS solver for 2D decaying homegenous isotropic turbulence problem for 
-# cartesian periodic domain [0,2pi] X [0,2pi].
-# Discretized uniformly in x and y direction
-# The solver uses pseudo-spectral method for solving 2D incompressible NSE
-# in vorticity-streamfunction formulation. The solver uses 
-# hybrid third-order Runge-Kutta implicit Crank-Nicolson scheme for time integration. 
-
-##
-using Printf
-println(string(Threads.nthreads())*" THREADS")
-using FFTW
-FFTW.set_num_threads(Threads.nthreads())
-using Plots, LaTeXStrings
-using Plots.PlotMeasures
-using DelimitedFiles
-using CUDA
-CUDA.device()
-gr()
 
 #%% Exact solution to Taylor-Green Vortex in 2D
 function exact_tgv(nx,ny,t,re)
@@ -995,7 +972,7 @@ function main()
             )
         annotate!([1e2],[1e-3],L"k^{-3}",font(16))
         
-        savefig("spectral/"*folder*"es_spectral.png")    
+        savefig("spectral/Testing set/"*folder*"es_spectral.png")    
 
     end
     # #%%

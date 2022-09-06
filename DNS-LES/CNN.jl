@@ -1,202 +1,127 @@
-import tensorflow as tf
-tf.random.set_seed(10)
-import random
-random.seed()
+using Flux, CUDA, Statistics, FFTW
+using Flux: onehotbatch, onecold, crossentropy, throttle
+FFTW.set_num_threads(Threads.nthreads())
+using Base.Iterators: repeated, partition
+using Printf
+using Plots, LaTeXStrings
+using Plots.PlotMeasures
+using DelimitedFiles
 
-#import matplotlib
-import os
-#import pickle
-import numpy as np
-#import pandas as pd
-##import tensorflow.compat.v1 as tf
-#tf.disable_v2_behavior() 
-#import xarray as xr
-#import seaborn as sns
-from keras import layers
-
-from keras.backend.tensorflow_backend import clear_session
-
-from keras.layers import Input, Convolution2D, Convolution1D, MaxPooling2D, Dense, Dropout, \
-                          Flatten, concatenate, Activation, Reshape, \
-                          UpSampling2D,ZeroPadding2D
-from keras.layers import Dense
-from keras import Sequential
-import h5py
-import keras
-#from pylab import plt
-#from matplotlib import cm
-from scipy.io import loadmat,savemat
-
-# Memory usage
-import psutil
-process = psutil.Process(os.getpid())
-println('Memory used by the process:')
-println(process.memory_info().rss)  # in bytes 
-
-import gc
-
-## Data set has 100k data points
-
-trainN=13000
-testN=2000
-lead=1;
-batch_size = 32
-num_epochs = 2
-pool_size = 2
-drop_prob=0.0
-conv_activation="relu"
-Nlat=256
-Nlon=256
-n_channels=2
-NT = 7500 # Numer of snapshots per file
-numDataset = 5 # number of dataset / 2
-
+gr()
+println(string(Threads.nthreads())*" THREADS")
+CUDA.device()
 println("Start....")
 
-input_normalized=np.zeros([trainN+testN,Nlon, Nlat,n_channels],np.float32)
-output_normalized=np.zeros([trainN+testN,Nlon,Nlat,1],np.float32)
-
-function reset_keras()
-    sess = tf.compat.v1.keras.backend.get_session()
-    tf.compat.v1.keras.backend.clear_session()
-    sess.close()
-    sess = tf.compat.v1.keras.backend.get_session()
-
-    # use the same config as you used to create the session
-    config = tf.compat.v1.ConfigProto()
-    config.gpu_options.per_process_gpu_memory_fraction = 1
-    config.gpu_options.visible_device_list = "0"
-    tf.compat.v1.keras.backend.set_session(tf.compat.v1.Session(config=config))
-end
-function build_model(conv_depth, kernel_size, hidden_size, n_hidden_layers, lr)
-
-    model = keras.Sequential([
-
-            ## Convolution with dimensionality reduction (similar to Encoder in an autoencoder)
-            Convolution2D(conv_depth, kernel_size, padding="same", activation=conv_activation, input_shape=(Nlon,Nlat,n_channels)),
-            #layers.MaxPooling2D(pool_size=pool_size),
-            #Dropout(drop_prob),
-            Convolution2D(conv_depth, kernel_size, padding="same", activation=conv_activation),
-            #layers.MaxPooling2D(pool_size=pool_size),
-            # end "encoder"
-    
-            Convolution2D(conv_depth, kernel_size, padding="same", activation=conv_activation),
-            #layers.MaxPooling2D(pool_size=pool_size),
-
-            Convolution2D(conv_depth, kernel_size, padding="same", activation=conv_activation),
-            #layers.MaxPooling2D(pool_size=pool_size),
-
-            Convolution2D(conv_depth, kernel_size, padding="same", activation=conv_activation),
-            #layers.MaxPooling2D(pool_size=pool_size),
-
-            #Convolution2D(conv_depth, kernel_size, padding="same", activation=conv_activation),
-            #layers.MaxPooling2D(pool_size=pool_size),
-
-            #Convolution2D(conv_depth, kernel_size, padding="same", activation=conv_activation),
-            #layers.MaxPooling2D(pool_size=pool_size),
-
-            # dense layers (flattening and reshaping happens automatically)
-            ] + [keras.layers.Dense(hidden_size, activation="sigmoid") for i in range(n_hidden_layers)] +
-
-            [
-
-            # start "Decoder" (mirror of the encoder above)
-            #Convolution2D(conv_depth, kernel_size, padding="same", activation=conv_activation),
-            #layers.UpSampling2D(size=pool_size),
-            #Convolution2D(conv_depth, kernel_size, padding="same", activation=conv_activation),
-            #layers.UpSampling2D(size=pool_size),
-            Convolution2D(conv_depth, kernel_size, padding="same", activation=conv_activation),
-            #layers.UpSampling2D(size=pool_size),
-            Convolution2D(conv_depth, kernel_size, padding="same", activation=conv_activation),
-            #layers.UpSampling2D(size=pool_size),
-            Convolution2D(conv_depth, kernel_size, padding="same", activation=conv_activation),
-            #layers.UpSampling2D(size=pool_size),
-            Convolution2D(conv_depth, kernel_size, padding="same", activation=conv_activation),
-            #layers.UpSampling2D(size=pool_size),
-            Convolution2D(conv_depth, kernel_size, padding="same", activation=conv_activation),
-            #layers.UpSampling2D(size=pool_size),
-            layers.Convolution2D(1, kernel_size, padding="same", activation=None)
-            ]
-            )
-    optimizer= keras.optimizers.adam(lr=lr)
-
-
-    model.compile(loss="mean_squared_error", optimizer = optimizer)
-
-    return model
+function make_minibatch(X, Y, idxs)
+  input_batch = Array{Float32}(undef, size(X[1])..., 1, length(idxs))
+  for i in 1:length(idxs)
+      input_batch[:, :, :, i] = Float32.(X[idxs[i]])
+  end
+  output_batch = onehotbatch(Y[idxs], 0:9)
+  return (input_batch, output_batch)
 end
 
-params = {"conv_depth": 64, "hidden_size": 5000,
-              "kernel_size": 5, "lr": 0.00001, "n_hidden_layers": 0}
+function build_model(conv_depth, kernel_size, act_func)
+
+  @printf("CNN depth: %i\n",conv_depth)
+  @printf("Kernel size: %i\n",kernel_size[1])
+
+  model = Chain(
+    Conv(kernel_size,2 => conv_depth,act_func,pad=SamePad()),
+    Conv(kernel_size,conv_depth => conv_depth,act_func,pad=SamePad()),
+    Conv(kernel_size,conv_depth => conv_depth,act_func,pad=SamePad()),
+    Conv(kernel_size,conv_depth => conv_depth,act_func,pad=SamePad()),
+    Conv(kernel_size,conv_depth => conv_depth,act_func,pad=SamePad()),
+    Conv(kernel_size,conv_depth => conv_depth,act_func,pad=SamePad()),
+    Conv(kernel_size,conv_depth => conv_depth,act_func,pad=SamePad()),
+    Conv(kernel_size,conv_depth => conv_depth,act_func,pad=SamePad()),
+    Conv(kernel_size,conv_depth => conv_depth,act_func,pad=SamePad()),
+    Conv(kernel_size,conv_depth => conv_depth,act_func,pad=SamePad()),
+    Conv(kernel_size,conv_depth => 1,identity,pad=SamePad()),
+    ) #|> gpu
+  return model
+
+end
+
+function main()
+  # read input file
+  l1 = []
+  filename = "input.txt"
+  open(filename,"r")
+  l1 = readdlm(filename,comment_char='!')[:,1]
+
+  nd = Int64(l1[1])       #NXF=NYF, resolution
+  nt = Int64(l1[2])       #NT, number of time step
+  re = Float64(l1[3])     #Re, Reynolds number 
+  dt = Float64(l1[4])     #dt; time step
+  ns = Int64(l1[5])       #nf;number of files to store
+  isolver = Int64(l1[6])  #isolver:[1]ikeda, [2]arakawa
+  isc = Int64(l1[7])      #isc; [0]don't write-screen, [1]write-screen
+  ich = Int64(l1[8])      #ich; Check for the file
+  ipr = Int64(l1[9])      #ipr; [1]TGV, [2]VM, [3]Decay 
+  ndc = Int64(l1[10])     #NXC=NYC, coarse resolution
+  opt = Int64(l1[11])     #Dealiasing algorithm:[1]3/2 padding, [2]FT, [3],FS
+  ichkp = Int64(l1[12])   #ichkp; [0]t=0, [1]checkpoint
+  istart = Int64(l1[13])  #istart; last saved file (starting point)
+
+  freq = Int(nt/ns)
+
+  ## Data set has 350 data points
+  trainN=300
+  testN=50
+  lead=1;
+  batch_size = 32
+  num_epochs = 2
+  pool_size = 2
+  drop_prob=0.0
+  Nlat=257
+  Nlon=257
+  n_channels=2
+  NT = 7500 # Numer of snapshots per file
+  numDataset = 5 # number of dataset / 2
+
+  input_normalised = zeros(Float32,Nlon,Nlat,n_channels,trainN+testN)
+  output_normalised = zeros(Float32,Nlon,Nlat,1,trainN+testN)
+
+  # CNN Parameters
+  params = (conv_depth = 64, kernel_size = (5,5), act_func=relu)
+  CNN_model = build_model(params...)
+
+  # Load training + testing data
+  folder = "data_"*string(nd)*"_re_"*string(Int(re))*"_v2"
+  for i in 50:ns
+    file_input_w = "spectral/"*folder*"/05_LES_vorticity/w_"*string(i)*".csv"
+    file_input_s = "spectral/"*folder*"/07_LES_streamfunction/s_"*string(i)*".csv"
+    input_normalised[:,:,1,i] = readdlm(file_input_w, ',', Float32)
+    input_normalised[:,:,2,i] = readdlm(file_input_s, ',', Float32)
+    file_input_s = "spectral/"*folder*"/03_subgrid_scale_term/sgs_"*string(i)*".csv"
+    output_normalised[:,:,1,i] = readdlm(file_input_s, ',', Float32)
+  end
+
+  input_train = input_normalised[:,:,:,50:trainN+50]
+  output_train = output_normalised[:,:,:,50:trainN+50]
+
+  input_test = input_normalised[:,:,:,trainN+50:trainN+50]
+  output_test = output_normalised[:,:,:,trainN+50:trainN+50]
+
+  # Bundle snapshots together into minibatches
+  mb_idxs = partition(1:length(input_train), batch_size)
+  train_set = [make_minibatch(input_train, output_train, i) for i in mb_idxs]
+
+  # Prepare test set as one giant minibatch:
 
 
-for i in range(0,numDataset)
+  input_normalised |> gpu
+  output_normalised |> gpu
+  loss = Flux.Losses.mse(CNN_model(input_normalised),output_normalised)
+  opt = ADAM(1e-5)
+  println("TRAINING BEGIN")
+  for i in 1:4000
+    Flux.train!(loss, Flux.params(CNN_model), train_set, opt)
+    if mod(i,100) == 0
+      @printf("Epoch: %i, MSE = %6.4e\n",i,loss)
+    end
+  end
+end
 
-    Filename = '/oasis/scratch/comet/yg62/temp_project/CNN/Re32k/split Data v2/Data' + str(i*2) + '.mat'
-    with h5py.File(Filename, 'r') as f:
-      input_normalized[0:NT,:,:,:]=np.array(f['input_normalized'],np.float32).T
-      output_normalized[0:NT,:,:,:]=np.array(f['output_normalized'],np.float32).T
-      f.close()
-
-    Filename = '/oasis/scratch/comet/yg62/temp_project/CNN/Re32k/split Data v2/Data' + str(i*2+1) + '.mat'
-    with h5py.File(Filename, 'r') as f:
-      input_normalized[NT:,:,:,:]=np.array(f['input_normalized'],np.float32).T
-      output_normalized[NT:,:,:,:]=np.array(f['output_normalized'],np.float32).T
-      f.close()
-
-      index=np.random.permutation(trainN+testN)
-      input_normalized=input_normalized[index,:,:,:]
-      output_normalized=output_normalized[index,:,:,:]
-
-      println('Finish Initialization')
-      println(np.shape(input_normalized))
-      println('Memory taken by input:')
-      println(input_normalized.nbytes)
-      println('Memory taken by output:')
-      println(np.shape(output_normalized))
-      println(output_normalized.nbytes)
-
-
-    # Reset and free GPU memory
-    #tf.keras.backend.clear_session()
-    reset_keras()
-
-    model = build_model(**params)
-
-    #if i != 0:
-    model.load_weights('./weights_cnn_KT') # load model weight from last time
-
-    println(model.summary())
-
-    hist = model.fit(input_normalized[0:trainN,:,:,:], output_normalized[0:trainN,:,:,:],
-                 batch_size = batch_size,shuffle='True',
-                 verbose=1,
-                 epochs = num_epochs,
-                 validation_data=(input_normalized[trainN:,:,:,:],output_normalized[trainN:,:,:,:]))
-
-    model.save_weights('./weights_cnn_KT')
-    
-    #loss = hist.history['loss']
-    #val_loss = hist.history['val_loss']
-    #savemat('loss' + str(i) + '.mat' ,dict([('trainLoss',loss),('valLoss',val_loss)]))
-
-    #del input_normalized
-    #del output_normalized
-    del hist
-    #del f
-    if i != numDataset-1:
-        del model
-    gc.collect()
-    process = psutil.Process(os.getpid())
-    println('Memory used by the process:')
-    println(process.memory_info().rss)  # in bytes 
-    println('finished training dataset' + str(i+1) + '/' + str(numDataset))
-
-
-prediction=model.predict(input_normalized[trainN:,:,:,:])
-
-#println(np.shape(output_normalized[trainN:,:,:,:]))
-
-#input_normalized[trainN:trainN+100,:,:,:]),
-
-savemat('prediction_KT.mat',dict([('test',output_normalized[trainN:trainN+100,:,:,:]),('input',input_normalized[trainN:trainN+100,:,:,:]),('prediction',prediction[0:100,:,:])])) 
+main()

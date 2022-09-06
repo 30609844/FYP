@@ -745,12 +745,12 @@ function write_data(jc,jcoarse,sgs,w,s,w_LES,s_LES,n,folder)
     writedlm(filename,jcoarse,',')
     filename = "spectral/"*folder*"/03_subgrid_scale_term/sgs_"*string(n)*".csv"
     writedlm(filename,sgs,',')
-    filename = "spectral/"*folder*"/04_DNS_vorticity/w_"*string(n)*".csv"
-    writedlm(filename,w,',')
+    # filename = "spectral/"*folder*"/04_DNS_vorticity/w_"*string(n)*".csv"
+    # writedlm(filename,w,',')
     filename = "spectral/"*folder*"/05_LES_vorticity/w_"*string(n)*".csv"
     writedlm(filename,w_LES,',')
-    filename = "spectral/"*folder*"/06_DNS_streamfunction/s_"*string(n)*".csv"
-    writedlm(filename,s,',')
+    # filename = "spectral/"*folder*"/06_DNS_streamfunction/s_"*string(n)*".csv"
+    # writedlm(filename,s,',')
     filename = "spectral/"*folder*"/07_LES_streamfunction/s_"*string(n)*".csv"
     writedlm(filename,s_LES,',')
 end
@@ -985,10 +985,10 @@ function main()
             sgs = jc - jcoarse # THIS SGS IS SUBTRACTED ON THE RHS
             write_data(jc,jcoarse,sgs,w,s,w_LES,s_LES,Int(n/freq),folder)
             @printf("n: %3i, t = %6.4f %4ix%4i\n",n,t,nx,ny)
-            # println("n: $n, t = $(round(t+tchkp; digits=4)) $(size(wnf)[1])x$(size(wnf)[2])")
-            if (mod(n,25*freq) == 0)
-                w_plot(nx,ny,dt,w0,w,folder,n)
-            end
+
+            # if (mod(n,25*freq) == 0)
+            #     w_plot(nx,ny,dt,w0,w,folder,n)
+            # end
         end
     end
     w = wave2phy(nx,ny,wnf,P) # final vorticity field in physical space            
@@ -1001,8 +1001,11 @@ function main()
     if (ipr == 3)
         en, n = energy_spectrum(w,k2,P)
         en0, n = energy_spectrum(w0,k2,P)
+        en_filt, nc = energy_spectrum(w_LES,k2c,Pc)
+
         k = LinRange(1,n,n)
-        
+        kc = LinRange(1,nc,nc)
+
         k0 = 10.0
         c = @. 4.0/(3.0*sqrt(pi)*(k0^5))           
         ese = @. c*(k^4)*exp(-(k/k0)^2)
@@ -1013,7 +1016,7 @@ function main()
 
     #%%
     # energy spectrum plot for DHIT problem
-    if (ipr == 3)
+    if (ipr == 4)
     
         line = @. 100*k^(-3.0)
         
@@ -1051,6 +1054,30 @@ function main()
             yscale = :log,
             label=latexstring("t = "*string(dt*nt)))
 
+        p1 = plot!(kc,en_filt[2:end],
+            lw=2,
+            ls = :dash,
+            linecolor = :cyan,
+            xscale = :log,
+            yscale = :log,
+            label=latexstring("Filtered t = "*string(dt*nt)))
+
+        p1 = plot!(k,exp.(-(1/24)*k.^2*Δ^2),
+            lw=1,
+            ls = :dot,
+            linecolor = :red,
+            xscale = :log,
+            yscale = :log,
+            label=latexstring("Gaussian Filter"))
+
+        p1 = plot!((ndc/2)*[1,1],[1e-16,1],
+            lw=1,
+            ls = :dot,
+            linecolor = :black,
+            xscale = :log,
+            yscale = :log,
+            label=latexstring("k_c"))
+
         p1 = plot!(k,line,
             lw=2,
             ls = :dash,
@@ -1061,7 +1088,7 @@ function main()
             )
         annotate!([1e2],[1e-3],L"k^{-3}",font(16))
         
-        savefig("spectral/"*folder*"es_spectral.png")    
+        savefig("spectral/Testing set/"*folder*"es_spectral.png")   
 
     end
     # #%%
@@ -1082,7 +1109,7 @@ function main()
     # savefig("vorticity_3D1.png", dpi=30)
 end
 
-# main()
+main()
 
 
 
