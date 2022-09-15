@@ -66,9 +66,9 @@ function main()
 
   freq = Int(nt/ns)
 
-  ## Data set has 350 data points
-  trainN=300
-  testN=50
+  ## Data set has 7000 data points
+  trainN=7000
+  testN=350
   lead=1;
   batch_size = 32
   num_epochs = 2
@@ -87,16 +87,27 @@ function main()
   params = (conv_depth = 64, kernel_size = (5,5), act_func=relu)
   CNN_model = build_model(params...)
 
-  # Load training + testing data
+  # Load training data
   folder = "data_"*string(nd)*"_re_"*string(Int(re))*"_v2"
-  for i in 50:ns
-    file_input_w = "spectral/"*folder*"/05_LES_vorticity/w_"*string(i)*".csv"
-    file_input_s = "spectral/"*folder*"/07_LES_streamfunction/s_"*string(i)*".csv"
+  for i in 1000:1000+trainN
+    file_input_w = "spectral/Training set/"*folder*"/05_LES_vorticity/w_"*string(i)*".csv"
+    file_input_s = "spectral/Training set"*folder*"/07_LES_streamfunction/s_"*string(i)*".csv"
     input_normalised[:,:,1,i] = readdlm(file_input_w, ',', Float32)
     input_normalised[:,:,2,i] = readdlm(file_input_s, ',', Float32)
-    file_input_s = "spectral/"*folder*"/03_subgrid_scale_term/sgs_"*string(i)*".csv"
+    file_input_s = "spectral/Training set"*folder*"/03_subgrid_scale_term/sgs_"*string(i)*".csv"
     output_normalised[:,:,1,i] = readdlm(file_input_s, ',', Float32)
   end
+
+  # Load testing data
+  folder = "data_"*string(nd)*"_re_"*string(Int(re))*"_v2"
+  for i in 50:50+testN
+    file_input_w = "spectral/Testing set/"*folder*"/05_LES_vorticity/w_"*string(i)*".csv"
+    file_input_s = "spectral/Testing set"*folder*"/07_LES_streamfunction/s_"*string(i)*".csv"
+    input_normalised[:,:,1,i] = readdlm(file_input_w, ',', Float32)
+    input_normalised[:,:,2,i] = readdlm(file_input_s, ',', Float32)
+    file_input_s = "spectral/Training set"*folder*"/03_subgrid_scale_term/sgs_"*string(i)*".csv"
+    output_normalised[:,:,1,i] = readdlm(file_input_s, ',', Float32)
+   end
 
   input_train = input_normalised[:,:,:,50:trainN+50]
   output_train = output_normalised[:,:,:,50:trainN+50]

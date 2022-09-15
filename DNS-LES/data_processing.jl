@@ -993,7 +993,7 @@ function main()
     # savefig("vorticity_3D1.png", dpi=30)
 end
 
-main()
+# main()
 
 
 
@@ -1124,13 +1124,17 @@ end
 #     file_input = "spectral/"*folder*"/"*var*"/"*string(i)*".csv"
 #     f = readdlm(file_input, ',', Float64)
 # end
-# anim = @animate for i ∈ 1:36
-#     println(i)
-#     t = round(dt*i,digits=4)
-#     file_input = "spectral/"*folder*"/"*"04_DNS_vorticity"*"/"*"w_"*string(i)*".csv"
-#     w = readdlm(file_input, ',', Float64)
-#     p1 = heatmap(w,clim=(minimum(w0),maximum(w0)),size=(1920,1080),axis = nothing,colorbar=false,left_margin = [1mm 1mm],
-#     bottom_margin = [1mm 1mm])
-#     plot(p1)
-# end
-# gif(anim, "Vorticity_Re32000.gif", fps = 30)
+folder = "data_"*string(2048)*"_re_"*string(Int(32000))*"_v2"
+file_input = "spectral/"*folder*"/"*"04_DNS_vorticity"*"/"*"w_0.csv"
+w0 = readdlm(file_input, ',', Float64)
+dt = 4/400
+anim = @animate for i ∈ 0:2:400
+    println(i)
+    t = round(dt*i,digits=2)
+    file_input = "spectral/"*folder*"/"*"04_DNS_vorticity"*"/"*"w_"*string(i)*".csv"
+    w = readdlm(file_input, ',', Float64)
+    p1 = heatmap(w,clim=(minimum(w0),maximum(w0)),size=(1920,1080),axis = nothing,colorbar=false,left_margin = [1mm 1mm],
+    bottom_margin = [1mm 1mm])
+    plot(p1)
+end
+gif(anim, "Vorticity_Re32000_full.gif", fps =50)
