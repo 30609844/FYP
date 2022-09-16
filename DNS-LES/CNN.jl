@@ -1,4 +1,4 @@
-using Flux, CUDA, Statistics, FFTW
+using Flux, CUDA, Statistics, FFTW, Random
 using Flux: onehotbatch, onecold, crossentropy, throttle
 FFTW.set_num_threads(Threads.nthreads())
 using Base.Iterators: repeated, partition
@@ -13,11 +13,12 @@ CUDA.device()
 println("Start....")
 
 function make_minibatch(X, Y, idxs)
-  input_batch = Array{Float32}(undef, size(X[1])..., 1, length(idxs))
+  input_batch = Array{Float32}(undef, size(X[:,:,:,1])..., length(idxs))
+  output_batch = Array{Float32}(undef, size(Y[:,:,:,1])..., length(idxs))
   for i in 1:length(idxs)
-      input_batch[:, :, :, i] = Float32.(X[idxs[i]])
+      input_batch[:, :, :, i] = Float32.(X[:,:,:,idxs[i]])
+      output_batch[:, :, :, i] = Float32.(Y[:,:,:,idxs[i]])
   end
-  output_batch = onehotbatch(Y[idxs], 0:9)
   return (input_batch, output_batch)
 end
 
@@ -70,62 +71,71 @@ function main()
   trainN=7000
   testN=350
   lead=1;
-  batch_size = 32
-  num_epochs = 2
+  minibatch_size = 35
+  num_epochs = Int64(trainN/minibatch_size)
   pool_size = 2
   drop_prob=0.0
   Nlat=257
   Nlon=257
   n_channels=2
-  NT = 7500 # Numer of snapshots per file
+  NT = 7000 # Numer of snapshots per file
   numDataset = 5 # number of dataset / 2
 
-  input_normalised = zeros(Float32,Nlon,Nlat,n_channels,trainN+testN)
-  output_normalised = zeros(Float32,Nlon,Nlat,1,trainN+testN)
+  idxs = shuffle(1:7000).+1000
+  mb_idxs = partition(1:trainN, minibatch_size)
+
+  
+
+  input_train = zeros(Float32,Nlon,Nlat,n_channels,trainN)
+  output_train = zeros(Float32,Nlon,Nlat,1,trainN)
+  input_test = zeros(Float32,Nlon,Nlat,n_channels,testN)
+  output_test = zeros(Float32,Nlon,Nlat,1,testN)
+
+  # Load training data
+  folder = "data_"*string(nd)*"_re_"*string(Int(re))*"_v2"
+  for i in 1:trainN
+    file_input_w = "spectral/Training set/"*folder*"/05_LES_vorticity/w_"*string(i+1000)*".csv"
+    file_input_s = "spectral/Training set/"*folder*"/07_LES_streamfunction/s_"*string(i+1000)*".csv"
+    input_train[:,:,1,i] = readdlm(file_input_w, ',', Float32)/std(readdlm(file_input_w, ',', Float32))
+    input_train[:,:,2,i] = readdlm(file_input_s, ',', Float32)/std(readdlm(file_input_s, ',', Float32))
+    file_input_sgs = "spectral/Training set/"*folder*"/03_subgrid_scale_term/sgs_"*string(i+1000)*".csv"
+    output_train[:,:,1,i] = readdlm(file_input_sgs, ',', Float32)/std(readdlm(file_input_sgs, ',', Float32))
+  end
+
+  # Load testing data
+  folder = "data_"*string(nd)*"_re_"*string(Int(re))*"_v2"
+  for i in 1:testN
+    file_input_w = "spectral/Testing set/"*folder*"/05_LES_vorticity/w_"*string(i+50)*".csv"
+    file_input_s = "spectral/Testing set/"*folder*"/07_LES_streamfunction/s_"*string(i+50)*".csv"
+    input_test[:,:,1,i] = readdlm(file_input_w, ',', Float32)/std(readdlm(file_input_w, ',', Float32))
+    input_test[:,:,2,i] = readdlm(file_input_s, ',', Float32)/std(readdlm(file_input_s, ',', Float32))
+    file_input_sgs = "spectral/Testing set/"*folder*"/03_subgrid_scale_term/sgs_"*string(i+50)*".csv"
+    output_test[:,:,1,i] = readdlm(file_input_s, ',', Float32)/std(readdlm(file_input_sgs, ',', Float32))
+   end
+
+  # Bundle snapshots together into minibatches
+  mb_idxs = partition(1:trainN, minibatch_size)
+  train_set = [make_minibatch(input_train, output_train, i) for i in mb_idxs]
+
+  # Prepare test set as one giant minibatch:
+  test_set = make_minibatch(input_test, output_test, 1:testN)
+
+  # Load model and datasets onto GPU, if enabled
+  train_set |> gpu
+  test_set |> gpu
 
   # CNN Parameters
   params = (conv_depth = 64, kernel_size = (5,5), act_func=relu)
   CNN_model = build_model(params...)
 
-  # Load training data
-  folder = "data_"*string(nd)*"_re_"*string(Int(re))*"_v2"
-  for i in 1000:1000+trainN
-    file_input_w = "spectral/Training set/"*folder*"/05_LES_vorticity/w_"*string(i)*".csv"
-    file_input_s = "spectral/Training set"*folder*"/07_LES_streamfunction/s_"*string(i)*".csv"
-    input_normalised[:,:,1,i] = readdlm(file_input_w, ',', Float32)
-    input_normalised[:,:,2,i] = readdlm(file_input_s, ',', Float32)
-    file_input_s = "spectral/Training set"*folder*"/03_subgrid_scale_term/sgs_"*string(i)*".csv"
-    output_normalised[:,:,1,i] = readdlm(file_input_s, ',', Float32)
-  end
+  # Make sure our model is nicely precompiled before starting our training loop
+  CNN_model(train_set[1][1])
 
-  # Load testing data
-  folder = "data_"*string(nd)*"_re_"*string(Int(re))*"_v2"
-  for i in 50:50+testN
-    file_input_w = "spectral/Testing set/"*folder*"/05_LES_vorticity/w_"*string(i)*".csv"
-    file_input_s = "spectral/Testing set"*folder*"/07_LES_streamfunction/s_"*string(i)*".csv"
-    input_normalised[:,:,1,i] = readdlm(file_input_w, ',', Float32)
-    input_normalised[:,:,2,i] = readdlm(file_input_s, ',', Float32)
-    file_input_s = "spectral/Training set"*folder*"/03_subgrid_scale_term/sgs_"*string(i)*".csv"
-    output_normalised[:,:,1,i] = readdlm(file_input_s, ',', Float32)
-   end
+  loss(x,y) = Flux.Losses.mse(CNN_model(x),y)
 
-  input_train = input_normalised[:,:,:,50:trainN+50]
-  output_train = output_normalised[:,:,:,50:trainN+50]
-
-  input_test = input_normalised[:,:,:,trainN+50:trainN+50]
-  output_test = output_normalised[:,:,:,trainN+50:trainN+50]
-
-  # Bundle snapshots together into minibatches
-  mb_idxs = partition(1:length(input_train), batch_size)
-  train_set = [make_minibatch(input_train, output_train, i) for i in mb_idxs]
-
-  # Prepare test set as one giant minibatch:
-
-
-  input_normalised |> gpu
-  output_normalised |> gpu
-  loss = Flux.Losses.mse(CNN_model(input_normalised),output_normalised)
   opt = ADAM(1e-5)
+  @info("Beginning training loop...")
+
   println("TRAINING BEGIN")
   for i in 1:4000
     Flux.train!(loss, Flux.params(CNN_model), train_set, opt)
