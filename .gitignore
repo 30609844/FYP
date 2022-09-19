@@ -2,3 +2,4 @@ DNS-LES/spectral
 *.sh
 *.out
 *.gif
+*.bson
