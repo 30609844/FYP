@@ -69,18 +69,18 @@ function main()
   freq = Int(nt/ns)
   folder = "data_"*string(nd)*"_re_"*string(Int(re))*"_v2"
 
-  ## Data set has 7000 data points
-  trainN=7000
-  testN=350
+  ## Data set has 6000 data points
+  trainN=6000
+  testN=300
   lead=1;
-  minibatch_size = 14
+  minibatch_size = 12
   num_epochs = 2
   pool_size = 2
   drop_prob=0.0
   Nlat=256
   Nlon=256
   n_channels=2
-  NT = 7000 # Numer of snapshots per file
+  NT = 6000 # Numer of snapshots per file
   numDataset = 5 # number of dataset / 2
 
   # Load testing data
@@ -88,11 +88,11 @@ function main()
   output_test = zeros(Float32,Nlon,Nlat,1,testN)
   for i in 1:testN
     file_input_w = "spectral/Testing set/"*folder*"/05_LES_vorticity/w_"*string(i+50)*".csv"
-    file_input_s = "spectral/Testing set/"*folder*"/07_LES_streamfunction/s_"*string(i+50)*".csv"
+    file_input_s = "spectral/Testing set/"*folder*"/07_LES_streamfunction/s_"*string(i+100)*".csv"
     input_test[:,:,1,i] = readdlm(file_input_w, ',', Float32)[1:end-1,1:end-1]
     input_test[:,:,2,i] = readdlm(file_input_s, ',', Float32)[1:end-1,1:end-1]
-    file_input_sgs = "spectral/Testing set/"*folder*"/03_subgrid_scale_term/sgs_"*string(i+50)*".csv"
-    output_test[:,:,1,i] = readdlm(file_input_s, ',', Float32)[1:end-1,1:end-1]
+    file_input_sgs = "spectral/Testing set/"*folder*"/03_subgrid_scale_term/sgs_"*string(i+100)*".csv"
+    output_test[:,:,1,i] = readdlm(file_input_sgs, ',', Float32)[1:end-1,1:end-1]
   end
   input_test[:,:,1,:] = Flux.normalise(input_test[:,:,1,:])
   input_test[:,:,2,:] = Flux.normalise(input_test[:,:,2,:])
@@ -108,7 +108,7 @@ function main()
   CNN_model = build_model(params...)
   if isfile("CNN_weights.jl")
     @load "CNN_weights.bson" weights 
-    CNN_model = loadparams!(CNN_model,weights)
+    loadparams!(CNN_model,weights)
   end
   CNN_model |> gpu
 
@@ -132,7 +132,7 @@ function main()
   for epoch in 1:num_epochs
     @printf("EPOCH: %2i\n",epoch)
     # Permuted training data
-    train_idxs = shuffle(1:7000).+1000
+    train_idxs = shuffle(1:6000).+2000
     mb_idxs = partition(1:trainN, minibatch_size)
 
     # Iterating over every batch
@@ -165,7 +165,7 @@ function main()
     @save "CNN_weights.bson" weights
     avg_c = 0
     Random.seed!(2)
-    ind = shuffle(1:350)
+    ind = shuffle(1:300)
     for i in 1:100
       avg_c = avg_c + 0.01*corr_coeff(test_set[1][:,:,:,ind[i]:ind[i]],test_set[2][:,:,:,ind[i]:ind[i]])
     end
