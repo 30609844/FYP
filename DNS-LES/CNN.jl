@@ -10,7 +10,7 @@ using DelimitedFiles
 
 gr()
 println(string(Threads.nthreads())*" THREADS")
-CUDA.device()
+CUDA.device!(1)
 println("Start....")
 
 function make_minibatch(X, Y, idxs)
@@ -73,7 +73,7 @@ function main()
   trainN=6000
   testN=300
   lead=1;
-  minibatch_size = 12
+  minibatch_size = 30
   num_epochs = 2
   pool_size = 2
   drop_prob=0.0
@@ -89,14 +89,14 @@ function main()
   for i in 1:testN
     file_input_w = "spectral/Testing set/"*folder*"/05_LES_vorticity/w_"*string(i+50)*".csv"
     file_input_s = "spectral/Testing set/"*folder*"/07_LES_streamfunction/s_"*string(i+100)*".csv"
-    input_test[:,:,1,i] = readdlm(file_input_w, ',', Float32)[1:end-1,1:end-1]
-    input_test[:,:,2,i] = readdlm(file_input_s, ',', Float32)[1:end-1,1:end-1]
+    input_test[:,:,1,i] = Flux.normalise(readdlm(file_input_w, ',', Float32)[1:end-1,1:end-1])
+    input_test[:,:,2,i] = Flux.normalise(readdlm(file_input_s, ',', Float32)[1:end-1,1:end-1])
     file_input_sgs = "spectral/Testing set/"*folder*"/03_subgrid_scale_term/sgs_"*string(i+100)*".csv"
-    output_test[:,:,1,i] = readdlm(file_input_sgs, ',', Float32)[1:end-1,1:end-1]
+    output_test[:,:,1,i] = Flux.normalise(readdlm(file_input_sgs, ',', Float32)[1:end-1,1:end-1])
   end
-  input_test[:,:,1,:] = Flux.normalise(input_test[:,:,1,:])
-  input_test[:,:,2,:] = Flux.normalise(input_test[:,:,2,:])
-  output_test[:,:,1,:] = Flux.normalise(output_test[:,:,1,:])
+  # input_test[:,:,1,:] = Flux.normalise(input_test[:,:,1,:])
+  # input_test[:,:,2,:] = Flux.normalise(input_test[:,:,2,:])
+  # output_test[:,:,1,:] = Flux.normalise(output_test[:,:,1,:]) # stdSGS = 11.5
 
 
   # Prepare test set as one giant minibatch:
@@ -106,9 +106,8 @@ function main()
   # CNN Parameters
   params = (conv_depth = 64, kernel_size = (5,5), act_func=relu)
   CNN_model = build_model(params...)
-  if isfile("CNN_weights.jl")
-    @load "CNN_weights.bson" weights 
-    loadparams!(CNN_model,weights)
+  if isfile("CNN_model.bson")
+    @load "CNN_model.bson" CNN_model
   end
   CNN_model |> gpu
 
@@ -142,14 +141,14 @@ function main()
       for i in 1:minibatch_size
         file_input_w = "spectral/Training set/"*folder*"/05_LES_vorticity/w_"*string(train_idxs[index[i]])*".csv"
         file_input_s = "spectral/Training set/"*folder*"/07_LES_streamfunction/s_"*string(train_idxs[index[i]])*".csv"
-        input_train[:,:,1,i] = readdlm(file_input_w, ',', Float32)[1:end-1,1:end-1]
-        input_train[:,:,2,i] = readdlm(file_input_s, ',', Float32)[1:end-1,1:end-1]
+        input_train[:,:,1,i] = Flux.normalise(readdlm(file_input_w, ',', Float32)[1:end-1,1:end-1])
+        input_train[:,:,2,i] = Flux.normalise(readdlm(file_input_s, ',', Float32)[1:end-1,1:end-1])
         file_input_sgs = "spectral/Training set/"*folder*"/03_subgrid_scale_term/sgs_"*string(train_idxs[index[i]])*".csv"
-        output_train[:,:,1,i] = readdlm(file_input_sgs, ',', Float32)[1:end-1,1:end-1]
+        output_train[:,:,1,i] = Flux.normalise(readdlm(file_input_sgs, ',', Float32)[1:end-1,1:end-1])
       end
-      input_train[:,:,1,:] = Flux.normalise(input_train[:,:,1,:])
-      input_train[:,:,2,:] = Flux.normalise(input_train[:,:,2,:])
-      output_train[:,:,1,:] = Flux.normalise(output_train[:,:,1,:])
+      # input_train[:,:,1,:] = Flux.normalise(input_train[:,:,1,:])
+      # input_train[:,:,2,:] = Flux.normalise(input_train[:,:,2,:])
+      # output_train[:,:,1,:] = Flux.normalise(output_train[:,:,1,:])
 
       # Bundle snapshots together into minibatches
       train_set = [make_minibatch(input_train, output_train, 1:minibatch_size)]
@@ -160,9 +159,15 @@ function main()
       Flux.train!(loss, Flux.params(CNN_model), train_set, opt)
       @printf("Iteration: %3i, MSE = %6.4e\n",batch_no,loss(train_set[1][1],train_set[1][2]))
       batch_no += 1
+      if mod(batch_no,50)==0
+        cpu(CNN_model)
+        @save "CNN_model.bson" CNN_model
+        gpu(CNN_model)
+      end
     end
-    weights = Flux.params(CNN_model)
-    @save "CNN_weights.bson" weights
+    cpu(CNN_model)
+    @save "CNN_model.bson" CNN_model
+    gpu(CNN_model)
     avg_c = 0
     Random.seed!(2)
     ind = shuffle(1:300)
