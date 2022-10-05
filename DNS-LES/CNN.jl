@@ -73,21 +73,21 @@ function main()
   trainN=6000
   testN=300
   lead=1;
-  minibatch_size = 30
-  num_epochs = 2
+  minibatch_size = 40
+  num_epochs = 20
   pool_size = 2
   drop_prob=0.0
   Nlat=256
   Nlon=256
   n_channels=2
   NT = 6000 # Numer of snapshots per file
-  numDataset = 5 # number of dataset / 2
+  numDataset = 3 # number of dataset / 2
 
   # Load testing data
   input_test = zeros(Float32,Nlon,Nlat,n_channels,testN)
   output_test = zeros(Float32,Nlon,Nlat,1,testN)
   for i in 1:testN
-    file_input_w = "spectral/Testing set/"*folder*"/05_LES_vorticity/w_"*string(i+50)*".csv"
+    file_input_w = "spectral/Testing set/"*folder*"/05_LES_vorticity/w_"*string(i+100)*".csv"
     file_input_s = "spectral/Testing set/"*folder*"/07_LES_streamfunction/s_"*string(i+100)*".csv"
     input_test[:,:,1,i] = Flux.normalise(readdlm(file_input_w, ',', Float32)[1:end-1,1:end-1])
     input_test[:,:,2,i] = Flux.normalise(readdlm(file_input_s, ',', Float32)[1:end-1,1:end-1])
@@ -101,7 +101,7 @@ function main()
 
   # Prepare test set as one giant minibatch:
   test_set = make_minibatch(input_test, output_test, 1:testN)
-  test_set |> gpu
+  test_set = test_set |> gpu
 
   # CNN Parameters
   params = (conv_depth = 64, kernel_size = (5,5), act_func=relu)
@@ -109,7 +109,7 @@ function main()
   if isfile("CNN_model.bson")
     @load "CNN_model.bson" CNN_model
   end
-  CNN_model |> gpu
+  CNN_model = CNN_model |> gpu
 
   loss(x,y) = Flux.Losses.mse(CNN_model(x),y)
   corr_coeff(x,y) = cov(vec(CNN_model(x)),vec(y))/(std(CNN_model(x))*std(y))
@@ -123,7 +123,7 @@ function main()
   train_set = [make_minibatch(input_train, output_train, 1:minibatch_size)]
 
   # Load model and datasets onto GPU, if enabled
-  train_set |> gpu
+  train_set = train_set |> gpu
 
   # Make sure our model is nicely precompiled before starting our training loop
   CNN_model(train_set[1][1])
@@ -131,43 +131,46 @@ function main()
   for epoch in 1:num_epochs
     @printf("EPOCH: %2i\n",epoch)
     # Permuted training data
-    train_idxs = shuffle(1:6000).+2000
-    mb_idxs = partition(1:trainN, minibatch_size)
+    train_idxs = shuffle(1:trainN*numDataset)
+    mb_idxs = partition(1:trainN*numDataset, minibatch_size)
 
     # Iterating over every batch
     batch_no = 1
     for index in mb_idxs
       # Load training data
       for i in 1:minibatch_size
-        file_input_w = "spectral/Training set/"*folder*"/05_LES_vorticity/w_"*string(train_idxs[index[i]])*".csv"
-        file_input_s = "spectral/Training set/"*folder*"/07_LES_streamfunction/s_"*string(train_idxs[index[i]])*".csv"
+        file_input_w = "spectral/Training set "*string(Int(floor(1+train_idxs[index[i]]/trainN)))*"/"*folder*"/05_LES_vorticity/w_"*string(mod(train_idxs[index[i]],trainN)+2000)*".csv"
+        file_input_s = "spectral/Training set "*string(Int(floor(1+train_idxs[index[i]]/trainN)))*"/"*folder*"/07_LES_streamfunction/s_"*string(mod(train_idxs[index[i]],trainN)+2000)*".csv"
         input_train[:,:,1,i] = Flux.normalise(readdlm(file_input_w, ',', Float32)[1:end-1,1:end-1])
         input_train[:,:,2,i] = Flux.normalise(readdlm(file_input_s, ',', Float32)[1:end-1,1:end-1])
-        file_input_sgs = "spectral/Training set/"*folder*"/03_subgrid_scale_term/sgs_"*string(train_idxs[index[i]])*".csv"
+        file_input_sgs = "spectral/Training set "*string(Int(floor(1+train_idxs[index[i]]/trainN)))*"/"*folder*"/03_subgrid_scale_term/sgs_"*string(mod(train_idxs[index[i]],trainN)+2000)*".csv"
         output_train[:,:,1,i] = Flux.normalise(readdlm(file_input_sgs, ',', Float32)[1:end-1,1:end-1])
       end
       # input_train[:,:,1,:] = Flux.normalise(input_train[:,:,1,:])
       # input_train[:,:,2,:] = Flux.normalise(input_train[:,:,2,:])
       # output_train[:,:,1,:] = Flux.normalise(output_train[:,:,1,:])
+      # Find the std of raw sgs from t=1 to t=4, this will normalise the sgs term during LES
 
       # Bundle snapshots together into minibatches
       train_set = [make_minibatch(input_train, output_train, 1:minibatch_size)]
 
       # Load model and datasets onto GPU, if enabled
-      train_set |> gpu
+      train_set = train_set |> gpu
 
       Flux.train!(loss, Flux.params(CNN_model), train_set, opt)
-      @printf("Iteration: %3i, MSE = %6.4e\n",batch_no,loss(train_set[1][1],train_set[1][2]))
-      batch_no += 1
       if mod(batch_no,50)==0
-        cpu(CNN_model)
-        @save "CNN_model.bson" CNN_model
-        gpu(CNN_model)
+        @printf("Iteration: %3i, MSE = %6.4e\n",batch_no,loss(train_set[1][1],train_set[1][2]))
       end
+      batch_no += 1
+      # if mod(batch_no,50)==0
+      #   CNN_model = cpu(CNN_model)
+      #   @save "CNN_model.bson" CNN_model
+      #   CNN_model = gpu(CNN_model)
+      # end
     end
-    cpu(CNN_model)
+    CNN_model = cpu(CNN_model)
     @save "CNN_model.bson" CNN_model
-    gpu(CNN_model)
+    CNN_model = gpu(CNN_model)
     avg_c = 0
     Random.seed!(2)
     ind = shuffle(1:300)
@@ -179,3 +182,4 @@ function main()
 end
 
 main()
+# heatmap(aa,clim=(-7.7,7.7),size=(450,450),axis=nothing,cbar=false,c=:seismic)

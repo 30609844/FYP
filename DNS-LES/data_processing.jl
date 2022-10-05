@@ -701,8 +701,11 @@ function w_plot(nx,ny,dt,w0,w,folder,n)
     plot(c1,c2,size = (1400,600))
     savefig(filename)
 end
-
-#%%
+blank = plot(foreground_color_subplot=:white)
+l = @layout [grid(2, 2) a{0.095w}]
+plot(c1, c2, c3, c4, blank, layout=l, link=:all)
+p_all = scatter!([0], [0], zcolor=[NaN], clims=(minimum(w0),maximum(w0)), label="", colorbar_title="Vorticity", background_color_subplot=:transparent, markerstrokecolor=:transparent, framestyle=:none, inset=bbox(0.1, 0, 1, 0.9, :center, :right), subplot=6)
+# %%
 function write_data(jc,jcoarse,sgs,w,s,w_LES,s_LES,n,folder)
     
     
@@ -886,6 +889,7 @@ function main()
         en, n = energy_spectrum(w,k2,P)
         en0, n = energy_spectrum(w0,k2,P)
         en_filt, nc = energy_spectrum(w_LES,k2c,Pc)
+        en_LES_NM = readdlm("spectral/data_256_re_32000_v2/energy_spectral_"*string(ndc)*"_"*string(Int(re))*".csv",',', Float64)
 
         k = LinRange(1,n,n)
         kc = LinRange(1,nc,nc)
@@ -894,7 +898,7 @@ function main()
         c = @. 4.0/(3.0*sqrt(pi)*(k0^5))           
         ese = @. c*(k^4)*exp(-(k/k0)^2)
         
-        writedlm("spectral/"*folder*"energy_spectral_"*string(nd)*"_"*string(Int(re))*".csv", en, ',')
+        writedlm("spectral/"*folder*"/energy_spectral_"*string(nd)*"_"*string(Int(re))*".csv", en, ',')
     end
     #%%
 
@@ -902,11 +906,12 @@ function main()
     # energy spectrum plot for DHIT problem
     if (ipr == 3)
     
-        line = @. 100*k^(-3.0)
+        line = @. 100*k[20:110]^(-3.0)
         
         scalefontsizes(2)
         p1 = plot(k,ese,
             lw=2,
+            ls = :dash,
             linecolor = :green,
             xscale = :log,
             yscale = :log,
@@ -915,7 +920,7 @@ function main()
             yticks = exp10.(range(-16,stop=0,length=9)),
             xticks = exp10.(range(-0,stop=3,length=4)),
             ylims = (1e-16,1e-0),
-            label="Exact",
+            label=L"Exact",
             title = "TKE spectrum",
             legend = :bottomleft,
             left_margin = [10mm 0mm],
@@ -924,7 +929,7 @@ function main()
             
         p1 = plot!(k,en0[2:end],
             lw=2,
-            ls = :dash,
+            ls = :solid,
             linecolor = :red,
             xscale = :log,
             yscale = :log,
@@ -932,38 +937,54 @@ function main()
 
         p1 = plot!(k,en[2:end],
             lw=2,
-            ls = :dash,
+            ls = :solid,
             linecolor = :blue,
             xscale = :log,
             yscale = :log,
-            label=latexstring("t = "*string(dt*nt)))
+            label=latexstring("DNS"))
 
         p1 = plot!(kc,en_filt[2:end],
             lw=2,
-            ls = :dash,
+            ls = :solid,
             linecolor = :cyan,
             xscale = :log,
             yscale = :log,
-            label=latexstring("Filtered t = "*string(dt*nt)))
+            label=latexstring("Filtered DNS"))
+
+        p1 = plot!(kc,en_LES_NM[2:end],
+            lw=2,
+            ls = :solid,
+            linecolor = :magenta,
+            xscale = :log,
+            yscale = :log,
+            label=latexstring("LES-NM"))
+
+        # p1 = plot!(kc,en_LES_CNN[2:end],
+        #     lw=2,
+        #     ls = :solid,
+        #     linecolor = :magenta,
+        #     xscale = :log,
+        #     yscale = :log,
+        #     label=latexstring("LES-CNN"))
 
         p1 = plot!(k,exp.(-(1/24)*k.^2*Δ^2),
             lw=1,
-            ls = :dot,
+            ls = :dash,
             linecolor = :red,
             xscale = :log,
             yscale = :log,
             label=latexstring("Gaussian Filter"))
 
-        p1 = plot!((ndc/2)*[1,1],[1e-16,1],
+        p1 = plot!(nc*[1,1],[1e-16,1],
             lw=1,
-            ls = :dot,
+            ls = :dash,
             linecolor = :black,
             xscale = :log,
             yscale = :log,
-            label=latexstring("k_c"))
+            label=false)
 
-        p1 = plot!(k,line,
-            lw=2,
+        p1 = plot!(k[20:110],line,
+            lw=1,
             ls = :dash,
             linecolor = :black,
             xscale = :log,
@@ -971,8 +992,9 @@ function main()
             label=false
             )
         annotate!([1e2],[1e-3],L"k^{-3}",font(16))
+        annotate!([165],[1e-14],L"k_c",font(16))
         
-        savefig("spectral/Testing set/"*folder*"es_spectral.png")    
+        savefig("spectral/"*folder*"/es_spectral_LESNM.png")    
 
     end
     # #%%
@@ -1138,3 +1160,12 @@ anim = @animate for i ∈ 0:2:400
     plot(p1)
 end
 gif(anim, "Vorticity_Re32000_full.gif", fps =50)
+stds = zeros(8001,3)
+for i in 0:8000
+    file_input = "spectral/Training set/"*folder*"/05_LES_vorticity/w_"*string(i)*".csv"
+    stds[i+1,1] = std(readdlm(file_input, ',', Float64))
+    file_input = "spectral/Training set/"*folder*"/07_LES_streamfunction/s_"*string(i)*".csv"
+    stds[i+1,2] = std(readdlm(file_input, ',', Float64))
+    file_input = "spectral/Training set/"*folder*"/03_subgrid_scale_term/sgs_"*string(i)*".csv"
+    stds[i+1,3] = std(readdlm(file_input, ',', Float64))
+end

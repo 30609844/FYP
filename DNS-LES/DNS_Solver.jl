@@ -11,7 +11,7 @@
 # hybrid third-order Runge-Kutta implicit Crank-Nicolson scheme for time integration. 
 
 ##
-using Printf
+using Printf, Random
 println(string(Threads.nthreads())*" THREADS")
 using FFTW
 FFTW.set_num_threads(Threads.nthreads())
@@ -140,8 +140,8 @@ function decay_ic(nx,ny,dx,dy,iP)
     kx[1] = epsilon
     ky[1] = epsilon
     
-    ξ = 2.0*pi*rand(Int(nx/2+1), Int(ny/2+1))
-    η = 2.0*pi*rand(Int(nx/2+1), Int(ny/2+1))
+    ξ = 2.0*pi*rand(Random.seed!(21),Int(nx/2+1), Int(ny/2+1))
+    η = 2.0*pi*rand(Random.seed!(22),Int(nx/2+1), Int(ny/2+1))
 
     ind = falses(Int(nx/2+1), Int(ny/2+1))
     ind[2:Int(nx/2),2:Int(ny/2)] .= true
@@ -745,12 +745,12 @@ function write_data(jc,jcoarse,sgs,w,s,w_LES,s_LES,n,folder)
     writedlm(filename,jcoarse,',')
     filename = "spectral/"*folder*"/03_subgrid_scale_term/sgs_"*string(n)*".csv"
     writedlm(filename,sgs,',')
-    # filename = "spectral/"*folder*"/04_DNS_vorticity/w_"*string(n)*".csv"
-    # writedlm(filename,w,',')
+    filename = "spectral/"*folder*"/04_DNS_vorticity/w_"*string(n)*".csv"
+    writedlm(filename,w,',')
     filename = "spectral/"*folder*"/05_LES_vorticity/w_"*string(n)*".csv"
     writedlm(filename,w_LES,',')
-    # filename = "spectral/"*folder*"/06_DNS_streamfunction/s_"*string(n)*".csv"
-    # writedlm(filename,s,',')
+    filename = "spectral/"*folder*"/06_DNS_streamfunction/s_"*string(n)*".csv"
+    writedlm(filename,s,',')
     filename = "spectral/"*folder*"/07_LES_streamfunction/s_"*string(n)*".csv"
     writedlm(filename,s_LES,',')
 end
@@ -986,9 +986,9 @@ function main()
             write_data(jc,jcoarse,sgs,w,s,w_LES,s_LES,Int(n/freq),folder)
             @printf("n: %3i, t = %6.4f %4ix%4i\n",n,t,nx,ny)
 
-            # if (mod(n,25*freq) == 0)
-            #     w_plot(nx,ny,dt,w0,w,folder,n)
-            # end
+            if (mod(n,25*freq) == 0)
+                w_plot(nx,ny,dt,w0,w,folder,n)
+            end
         end
     end
     w = wave2phy(nx,ny,wnf,P) # final vorticity field in physical space            
@@ -999,6 +999,11 @@ function main()
     #%%
     # compute the exact, initial and final energy spectrum for DHIT problem
     if (ipr == 3)
+        file_input = "spectral/"*folder*"/04_DNS_vorticity/w_"*string(0)*".csv"
+        w0 = readdlm(file_input, ',', Float64)
+        file_input = "spectral/"*folder*"/04_DNS_vorticity/w_"*string(ns)*".csv"
+        w = readdlm(file_input, ',', Float64)
+
         en, n = energy_spectrum(w,k2,P)
         en0, n = energy_spectrum(w0,k2,P)
         en_filt, nc = energy_spectrum(w_LES,k2c,Pc)
@@ -1010,7 +1015,7 @@ function main()
         c = @. 4.0/(3.0*sqrt(pi)*(k0^5))           
         ese = @. c*(k^4)*exp(-(k/k0)^2)
         
-        writedlm("spectral/"*folder*"energy_spectral_"*string(nd)*"_"*string(Int(re))*".csv", en, ',')
+        writedlm("spectral/"*folder*"/energy_spectral_"*string(nd)*"_"*string(Int(re))*".csv", en, ',')
     end
     #%%
 
@@ -1018,11 +1023,12 @@ function main()
     # energy spectrum plot for DHIT problem
     if (ipr == 4)
     
-        line = @. 100*k^(-3.0)
+        line = @. 100*k[20:110]^(-3.0)
         
         scalefontsizes(2)
         p1 = plot(k,ese,
             lw=2,
+            ls = :dash,
             linecolor = :green,
             xscale = :log,
             yscale = :log,
@@ -1031,7 +1037,7 @@ function main()
             yticks = exp10.(range(-16,stop=0,length=9)),
             xticks = exp10.(range(-0,stop=3,length=4)),
             ylims = (1e-16,1e-0),
-            label="Exact",
+            label=L"Exact",
             title = "TKE spectrum",
             legend = :bottomleft,
             left_margin = [10mm 0mm],
@@ -1040,7 +1046,7 @@ function main()
             
         p1 = plot!(k,en0[2:end],
             lw=2,
-            ls = :dash,
+            ls = :solid,
             linecolor = :red,
             xscale = :log,
             yscale = :log,
@@ -1048,38 +1054,46 @@ function main()
 
         p1 = plot!(k,en[2:end],
             lw=2,
-            ls = :dash,
+            ls = :solid,
             linecolor = :blue,
             xscale = :log,
             yscale = :log,
-            label=latexstring("t = "*string(dt*nt)))
+            label=latexstring("DNS"))
 
         p1 = plot!(kc,en_filt[2:end],
             lw=2,
-            ls = :dash,
+            ls = :solid,
             linecolor = :cyan,
             xscale = :log,
             yscale = :log,
-            label=latexstring("Filtered t = "*string(dt*nt)))
+            label=latexstring("Filtered DNS"))
+
+        # p1 = plot!(kc,en_LES[2:end],
+        #     lw=2,
+        #     ls = :solid,
+        #     linecolor = :magenta,
+        #     xscale = :log,
+        #     yscale = :log,
+        #     label=latexstring("CNN-LES"))
 
         p1 = plot!(k,exp.(-(1/24)*k.^2*Δ^2),
             lw=1,
-            ls = :dot,
+            ls = :dash,
             linecolor = :red,
             xscale = :log,
             yscale = :log,
             label=latexstring("Gaussian Filter"))
 
-        p1 = plot!((ndc/2)*[1,1],[1e-16,1],
+        p1 = plot!(nc*[1,1],[1e-16,1],
             lw=1,
-            ls = :dot,
+            ls = :dash,
             linecolor = :black,
             xscale = :log,
             yscale = :log,
-            label=latexstring("k_c"))
+            label=false)
 
-        p1 = plot!(k,line,
-            lw=2,
+        p1 = plot!(k[20:110],line,
+            lw=1,
             ls = :dash,
             linecolor = :black,
             xscale = :log,
@@ -1087,8 +1101,9 @@ function main()
             label=false
             )
         annotate!([1e2],[1e-3],L"k^{-3}",font(16))
+        annotate!([165],[1e-14],L"k_c",font(16))
         
-        savefig("spectral/Testing set/"*folder*"es_spectral.png")   
+        savefig("spectral/"*folder*"/es_spectral_LESNM.png")  
 
     end
     # #%%

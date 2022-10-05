@@ -3,3 +3,6 @@ DNS-LES/spectral
 *.out
 *.gif
 *.bson
+*.svg
+*.png
+*.pdf
