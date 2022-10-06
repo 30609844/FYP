@@ -1,4 +1,4 @@
-\begin{thebibliography}{19}
+\begin{thebibliography}{23}
 \newcommand{\enquote}[1]{``#1''}
 \providecommand{\natexlab}[1]{#1}
 \providecommand{\url}[1]{\texttt{#1}}
@@ -113,5 +113,26 @@ Kingma, D.~P., and Ba, J., \enquote{Adam: A Method for Stochastic
   Optimization,} , 2014.
 \newblock \doi{10.48550/ARXIV.1412.6980},
   \urlprefix\url{https://arxiv.org/abs/1412.6980}.
+
+\bibitem[{Kraichnan(1967)}]{Kraichnan}
+Kraichnan, R.~H., \enquote{Inertial Ranges in Two-Dimensional Turbulence,}
+  \emph{The Physics of Fluids}, Vol.~10, No.~7, 1967, pp. 1417--1423.
+\newblock \doi{10.1063/1.1762301}.
+
+\bibitem[{Batchelor(1969)}]{batchelor1969computation}
+Batchelor, G.~K., \enquote{Computation of the energy spectrum in homogeneous
+  two-dimensional turbulence,} \emph{The Physics of Fluids}, Vol.~12, No.~12,
+  1969, pp. II--233.
+
+\bibitem[{Leith(1971)}]{leith1971atmospheric}
+Leith, C., \enquote{Atmospheric predictability and two-dimensional turbulence,}
+  \emph{Journal of the Atmospheric Sciences}, Vol.~28, No.~2, 1971, pp.
+  145--161.
+
+\bibitem[{Pawar et~al.(2020)Pawar, San, Rasheed, and Vedula}]{pawar2020priori}
+Pawar, S., San, O., Rasheed, A., and Vedula, P., \enquote{A priori analysis on
+  deep learning of subgrid-scale parameterizations for Kraichnan turbulence,}
+  \emph{Theoretical and Computational Fluid Dynamics}, Vol.~34, No.~4, 2020,
+  pp. 429--455.
 
 \end{thebibliography}

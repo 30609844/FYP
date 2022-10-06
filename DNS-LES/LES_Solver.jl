@@ -16,7 +16,7 @@ using FFTW, Zygote, Flux
 FFTW.set_num_threads(Threads.nthreads())
 using Flux: onehotbatch, onecold, crossentropy, throttle, loadparams!
 using BSON: @load, @save
-using Printf, Random
+using Printf, Random, Statistics
 using Plots, LaTeXStrings
 using Plots.PlotMeasures
 using DelimitedFiles
@@ -383,8 +383,8 @@ function LES_closure(wf,k2,iP,P,model)
     input = reshape([w;s],nx,nx,2,1)
     input = gpu(Float32.(input))
     Π = cpu(model(input)[:,:])
-    Π = Flux.normalise(Π)
     Π = Float64.(Π)
+    Π = Π/std(Π)
     Π = P*Π
     return Π
 end
@@ -978,13 +978,13 @@ function main()
     end
     #%%
 
-    wnf[:,:] = P*(complex.(w[1:end-1,1:end-1],0.0)) # fourier space forward
+    wnf[:,:] = P*(complex.(w0[1:end-1,1:end-1],0.0)) # fourier space forward
 
     #%%
     # initialize variables for time integration
     a1, a2, a3 = 8.0/15.0, 2.0/15.0, 1.0/3.0
     g1, g2, g3 = 8.0/15.0, 5.0/12.0, 3.0/4.0
-    r2, r3 = -17.0/60.0, -5.0/12.0
+    r2, r3 =              -17.0/60.0, -5.0/12.0
 
     z = 0.5*dt*k2/re
     d1 = a1*z
@@ -999,25 +999,25 @@ function main()
     sgstd = readdlm("spectral/stds.csv",',',Float64)[:,3]
     tinit = Int(ichkp*istart*freq)+1
     if ipr == 4
-        tinit = 1001
+        tinit = 10001
         nt += tinit
     end
     for n in tinit:nt
         looptime = time()
         t = n*dt
         # 1st step
-        jnf[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,wnf,iP,P,iP2,rP2,opt) + sgstd[2*n-1]*LES_closure(wnf,k2,iP,P,CNN_model)   
-        w1f[:,:] = @. ((1.0 - d1)/(1.0 + d1))*filter_gauss(Δ,k2,wnf) + (g1*dt*jnf)/(1.0 + d1) 
+        jnf[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,wnf,iP,P,iP2,rP2,opt) - sgstd[Int(floor(n/5))+1]*LES_closure(wnf,k2,iP,P,CNN_model)   
+        w1f[:,:] = @. ((1.0 - d1)/(1.0 + d1))*wnf + (g1*dt*jnf)/(1.0 + d1) 
         w1f[1,1] = 0.0
 
         # 2nd step
-        j1f[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,w1f,iP,P,iP2,rP2,opt) + sgstd[2*n-1]*LES_closure(w1f,k2,iP,P,CNN_model)
+        j1f[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,w1f,iP,P,iP2,rP2,opt) - sgstd[Int(floor(n/5))+1]*LES_closure(w1f,k2,iP,P,CNN_model)
         w2f[:,:] = @. ((1.0 - d2)/(1.0 + d2))*w1f + (r2*dt*jnf + g2*dt*j1f)/(1.0 + d2)
         w2f[1,1] = 0.0
 
         # 3rd step
-        j2f[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,w2f,iP,P,iP2,rP2,opt) + sgstd[2*n-1]*LES_closure(w2f,k2,iP,P,CNN_model)
-        wnf[:,:] = @. ((1.0 - d3)/(1.0 + d3))*w2f + (r3*dt*j1f + g3*dt*j2f)/(1.0 + d3) 
+        j2f[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,w2f,iP,P,iP2,rP2,opt) - sgstd[Int(floor(n/5))+1]*LES_closure(w2f,k2,iP,P,CNN_model)
+        wnf[:,:] = @. ((1.0 - d3)/(1.0 + d3))*w2f + (r3*dt*j1f + g3*dt*j2f)/(1.0 + d3)
         wnf[1,1] = 0.0
         a = time() - looptime
         @printf("Avg. %.5fs per RK3 step\n",a/3)
@@ -1069,7 +1069,7 @@ function main()
 
     #%%
     # compute the exact, initial and final energy spectrum for DHIT problem
-    if (ipr == 3)
+    if (ipr == 4)
         file_input = "spectral/"*folder*"/04_DNS_vorticity/w_"*string(0)*".csv"
         w0 = readdlm(file_input, ',', Float64)
         file_input = "spectral/"*folder*"/04_DNS_vorticity/w_"*string(ns)*".csv"
@@ -1129,15 +1129,15 @@ function main()
             linecolor = :blue,
             xscale = :log,
             yscale = :log,
-            label=latexstring("DNS"))
+            label=latexstring("LES_CNN"))
 
-        p1 = plot!(kc,en_filt[2:end],
-            lw=2,
-            ls = :solid,
-            linecolor = :cyan,
-            xscale = :log,
-            yscale = :log,
-            label=latexstring("Filtered DNS"))
+        # p1 = plot!(kc,en_filt[2:end],
+        #     lw=2,
+        #     ls = :solid,
+        #     linecolor = :cyan,
+        #     xscale = :log,
+        #     yscale = :log,
+        #     label=latexstring("Filtered DNS"))
 
         # p1 = plot!(kc,en_LES[2:end],
         #     lw=2,
@@ -1174,7 +1174,7 @@ function main()
         annotate!([1e2],[1e-3],L"k^{-3}",font(16))
         annotate!([165],[1e-14],L"k_c",font(16))
         
-        savefig("spectral/"*folder*"/es_spectral_LESNM.png")  
+        savefig("spectral/"*folder*"/es_spectral_LESNM_small.png")  
 
     end
     # #%%

@@ -1,16 +1,16 @@
 # Fdb version 3
-["bibtex AIAA_Liu_Kevin"] 1664869183 "AIAA_Liu_Kevin.aux" "AIAA_Liu_Kevin.bbl" "AIAA_Liu_Kevin" 1664992148
+["bibtex AIAA_Liu_Kevin"] 1665070171 "AIAA_Liu_Kevin.aux" "AIAA_Liu_Kevin.bbl" "AIAA_Liu_Kevin" 1665071138
   "./new-aiaa.bst" 1664240699 35686 a60a1aa8bda61b245dd8097a74e21b9a ""
-  "AIAA_Liu_Kevin.aux" 1664992147 4601 11de8f35ca0d14523d71dd6d90520d74 "pdflatex"
-  "references.bib" 1664864170 31571 4812066d9fd8dd4d32bad459ea637ee9 ""
+  "AIAA_Liu_Kevin.aux" 1665071137 6432 3ef4d5c4a89323ad6405109a0911e07e "pdflatex"
+  "references.bib" 1665058374 32542 30de3578a4d28ca6c9e29cf7c3efe55f ""
   (generated)
   "AIAA_Liu_Kevin.bbl"
   "AIAA_Liu_Kevin.blg"
-["pdflatex"] 1664992144 "f:/FYP/Paper/AIAA_Liu_Kevin.tex" "AIAA_Liu_Kevin.pdf" "AIAA_Liu_Kevin" 1664992148
-  "AIAA_Liu_Kevin.aux" 1664992147 4601 11de8f35ca0d14523d71dd6d90520d74 "pdflatex"
-  "AIAA_Liu_Kevin.bbl" 1664869183 5573 4ff08643b5dfad6537042ad4c764b78b "bibtex AIAA_Liu_Kevin"
-  "AIAA_Liu_Kevin.out" 1664992147 1308 f7e4923339b997e908644143b83d46e2 "pdflatex"
-  "AIAA_Liu_Kevin.tex" 1664992143 17266 52b849f2282fd137a8de63107ee5e610 ""
+["pdflatex"] 1665071134 "f:/FYP/Paper/AIAA_Liu_Kevin.tex" "AIAA_Liu_Kevin.pdf" "AIAA_Liu_Kevin" 1665071138
+  "AIAA_Liu_Kevin.aux" 1665071137 6432 3ef4d5c4a89323ad6405109a0911e07e "pdflatex"
+  "AIAA_Liu_Kevin.bbl" 1665070172 6586 8825139fb9af54a0e37a25d46f766985 "bibtex AIAA_Liu_Kevin"
+  "AIAA_Liu_Kevin.out" 1665071137 1308 f7e4923339b997e908644143b83d46e2 "pdflatex"
+  "AIAA_Liu_Kevin.tex" 1665071133 19783 91338d989e865c8284ffedd0053bd8c8 ""
   "C:/Users/Kevin/AppData/Local/MiKTeX/fonts/map/pdftex/pdftex.map" 1664240728 155652 d13676d72b65a41c4fbe6ee6f1c3c70d ""
   "C:/Users/Kevin/AppData/Local/MiKTeX/miktex/data/le/pdftex/pdflatex.fmt" 1649151616 10246960 6f6660178ff851d47d414215db7b7c99 ""
   "C:/Users/Kevin/AppData/Local/Programs/MiKTeX/fonts/enc/dvips/newtx/ntx-ec-tlf-pc.enc" 1639608625 3136 aac2e2476de8af6c827239df395814ee ""
@@ -182,7 +182,11 @@
   "C:/Users/Kevin/AppData/Local/Programs/MiKTeX/tex/latex/url/url.sty" 1388490452 12796 8edb7d69a20b857904dd0ea757c14ec9 ""
   "C:/Users/Kevin/AppData/Local/Programs/MiKTeX/tex/latex/xkeyval/xkeyval.sty" 1623009290 4902 efb3d66683a2da2a232f71e3a571a899 ""
   "C:/Users/Kevin/AppData/Local/Programs/MiKTeX/tex/latex/xstring/xstring.sty" 1626888562 123 a302f2c651a95033260db60e51527ae8 ""
-  "f:/FYP/Paper/AIAA_Liu_Kevin.tex" 1664992143 17266 52b849f2282fd137a8de63107ee5e610 ""
+  "DNS_field_1.png" 1665059215 971553 de9294e5194124937346efc42e565880 ""
+  "DNS_field_4.png" 1665059575 868622 b4d26eb36962e9adc12eca4a2d243551 ""
+  "STDs.png" 1665056365 31128 186a7a7809752185e52e386df81cb2c3 ""
+  "TKE_1.png" 1665063888 84159 de76df8fc859ccf5dd6b07c95fe9e9c7 ""
+  "f:/FYP/Paper/AIAA_Liu_Kevin.tex" 1665071133 19783 91338d989e865c8284ffedd0053bd8c8 ""
   "new-aiaa.cls" 1664240641 3046 6495496c6ec29c9d8effcadfbb8e6731 ""
   (generated)
   "AIAA_Liu_Kevin.aux"

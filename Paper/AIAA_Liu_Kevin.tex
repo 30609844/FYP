@@ -49,10 +49,7 @@ $\sigma$ & Standard deviation \\
 $\psi$ & Streamfunction \\
 $\omega$ & Vorticity \\
 $\overline{(\cdot)}$ & Filtered variable\\
-$\tilde{(\cdot)}$ & Fourier transformed variable\\
-$\langle \cdot \rangle $ & Mean\\
-$\ast $ & Convolution \\
-$\odot $ & Elementwise matrix multiplication
+$\tilde{(\cdot)}$ & Fourier transformed variable
 \end{longtable*}}
 \section{Introduction}
 \lettrine{T}{o} this day, turbulence remains one of the greatest unsolved problems in physics, as certain quantities in turbulent fluid flow can be both difficult to measure experimentally and model computationally due to their chaotic nature. In the context of turbulent flow, the governing partial differential equations (PDEs) are the 2D Navier-Stokes equations (NSEs), which are formulated in vorticity-streamfunction form. The scenario investigated in this work is that of 2D decaying homogeneous isotropic turbulence (2D-DHIT), which is found largely on the scale of geophysical and environmental flows, and is commonly used as a testbed for machine learning (ML) based techniques for SGS modelling\cite{xie2019artificial,2022_LES_CNN,TABELING20021,vallis2017atmospheric}.
@@ -158,7 +155,7 @@ Where the nonlinear term $\tilde{\mathcal{N}}$ is given by equation \eqref{nonli
     \gamma_{2} &= -5/12 & \rho_{2} &= 17/60 & \alpha_{2} &= 2/15\\
     \gamma_{3} &= -3/4 & \rho_{3} &= 5/12 & \alpha_{3} &= 1/3
 \end{align*}
-This scheme was chosen as it is superior to the commonly used Adams-Bashforth 2 (AB2) scheme. RK3-CN is stable with CFL numbers up to $\sqrt{3}$ compared to 1 for AB2, which is important as transient shocks during the flow evolution can magnify the local CFL number \cite{RK3CN}.
+This scheme was chosen as it is superior to the commonly used Adams-Bashforth 2 (AB2) scheme. RK3-CN is stable for CFL numbers up to $\sqrt{3}$ compared to 1 for AB2, which is important as transient shocks during the flow evolution can magnify the local CFL number \cite{RK3CN}.
 
 \subsection{Training CNN}
 A CNN was constructed with 10 pure convolution layers (no pooling or upsampling) with 64 channels each with a 5$\times$5 kernel size. The activation function chosen was the rectified linear function (ReLu) except for the last output layer, which was a one to one map.
@@ -170,19 +167,45 @@ The objective function for the model to minimise is the mean squared error (MSE)
 \begin{equation}
     MSE = \frac{1}{n}\sum_{i = 1}^{n}\left\lVert \Pi^{CNN}_{i} - \Pi^{FDNS}_{i} \right\rVert ^{2}
 \end{equation}
+The optimisation algorithm used was ADAM with a learning rate of 1e-5, a first-order gradient based optimisation algorithm \cite{ADAM}. As the total training data pool was far too large to be trained at once, minibatches of 40 samples were used to train the CNN. Given a total of 18000 training samples, 450 iterations were required to complete a single epoch (complete pass of the dataset). Training data for the CNN is taken from the DNS run after the flow exhibits self-similarity. To verify the performance of the CNN model, the correlation coefficient between the test data SGS terms and those predicted by the CNN will be recorded. The correlation coefficient $c$ is defined as:
+\begin{equation}
+    c = \frac{Cov(\Pi^{CNN},\Pi^{FDNS})}{\sigma_{\Pi^{CNN}}\sigma_{\Pi^{FDNS}}}
+\end{equation}
+The test data has 300 samples and is taken from an independent DNS run which is not seen at all by the CNN during training.
 \section{Results}
-After around $t=0.0$, the TKE spectrum begins to exhibit self-similarity, where an inertial range develops that follows the $k^{-3}$ scaling Kraichnan-Batchelor-Leith
+
 \subsection{DNS results}
+Regions which have positive vorticity are shaded red in figure \ref{fig:DNS_field} and cause the fluid domain to rotate anti-clockwise. Likewise, the opposite is true for negative vorticity regions which are shaded blue.
+\begin{figure}[htp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{DNS_field_1.png}
+    \includegraphics[width=0.8\textwidth]{DNS_field_4.png}
+    \caption{Vorticity field of the 2D-DHIT at Re = 32000. Self-similarity begins at t=1.0 and simulation ends at t=4.0}
+    \label{fig:DNS_field}
+\end{figure}
+\begin{figure}[htp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{TKE_1.png}
+    \caption{Turbulent kinetic energy spectrum. The Initial energy distribution is overlaid with the analytical equation and the inertial subrange as predicted in \cite{Kraichnan,batchelor1969computation,leith1971atmospheric} is clearly seen after t = 1.0}
+    \label{fig:TKE_1}
+\end{figure}
+After around $t=1.0$, the TKE spectrum begins to exhibit self-similarity, where an inertial range develops that follows the $k^{-3}$ scaling as theorised by Kraichnan-Batchelor-Leith \cite{Kraichnan,batchelor1969computation,leith1971atmospheric}.
+\pagebreak
 \subsection{A priori CNN}
+After training on the dataset for over 60 epochs, the CNN reached a correlation coefficient of 0.81 with the test dataset. This outperforms physics based SGS models such as Smagorinsky \cite{2022_LES_CNN,pawar2020priori} which typically achieves a correlation coefficient of 0.55 as it is a purely diffusive model.
+\pagebreak
 \subsection{A posteriori CNN}
+To run the CNN model a posteriori in a live CNN run, it must be scaled by the standard deviation of the SGS terms obtained from the DNS run. This is a consequence of input/output normalised training, where information on the standard deviation is lost. To remedy this, the ensemble average of the standard deviation of the SGS term was calculated at every time step, which is then used to renormalise the output of the CNN model.
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.75\textwidth]{STDs.png}
+    \caption{The standard deviation for the SGS terms rises sharply before decaying.}
+\end{figure}
+The peak of the SGS term standard deviation occurs right before the onset of self-similarity, suggesting that eddies at scales below the LES grid are most prevalent shortly after the initial condition.
 
-
-
-
+\pagebreak
 \section{Conclusion}
 
-A conclusion section is not required, though it is preferred. Although a conclusion may review the main points of the paper, do not replicate the abstract as the conclusion. A conclusion might elaborate on the importance of the work or suggest applications and extensions. \textit{Note that the conclusion section is the last section of the paper that should be numbered. The appendix (if present), acknowledgment, and references should be listed without numbers.}
-\cite{ADAM}
 
 \section*{Appendix A}
 \label{appendix:A}

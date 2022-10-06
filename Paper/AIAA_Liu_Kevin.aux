@@ -19,7 +19,7 @@
 \providecommand\HyField@AuxAddToCoFields[2]{}
 \gdef \LT@i {\LT@entry 
     {1}{54.36275pt}\LT@entry 
-    {1}{139.09001pt}}
+    {1}{116.64001pt}}
 \citation{xie2019artificial,2022_LES_CNN,TABELING20021,vallis2017atmospheric}
 \citation{moin1998direct}
 \citation{DNS1970}
@@ -27,6 +27,8 @@
 \citation{Raissi_part1}
 \citation{maulik2019subgrid}
 \citation{maulik2019subgrid}
+\citation{2022_LES_CNN,pope2000turbulent}
+\citation{pope2000turbulent}
 \@writefile{toc}{\contentsline {section}{\numberline {I}Introduction}{2}{section.1}\protected@file@percent }
 \@writefile{toc}{\contentsline {section}{\numberline {II}Methodology}{2}{section.2}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {II.A}DNS and LES}{2}{subsection.2.1}\protected@file@percent }
@@ -35,28 +37,39 @@
 \newlabel{eq:vort}{{1a}{2}{Governing equations}{equation.2.1a}{}}
 \newlabel{eq:streamvort}{{1b}{2}{Governing equations}{equation.2.1b}{}}
 \newlabel{nonlinearphys}{{2}{2}{Governing equations}{equation.2.2}{}}
-\citation{2022_LES_CNN,pope2000turbulent}
-\citation{pope2000turbulent}
 \citation{kmax_fullresolve}
 \citation{DNS_Primer,Python_spectral}
 \citation{DNS_Primer}
 \citation{cooley1965algorithm}
+\citation{Orszag_Alias,pope2000turbulent}
+\citation{Bowman_dealias,Phillips1959}
+\citation{Python_spectral,Bowman_dealias,Orszag_Alias}
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {II.A.2}Numerical method}{3}{subsubsection.2.1.2}\protected@file@percent }
 \newlabel{FFT}{{7}{3}{Numerical method}{equation.2.7}{}}
 \newlabel{inverseFFT}{{8}{3}{Numerical method}{equation.2.8}{}}
 \newlabel{eq:vort_wave}{{9a}{3}{Numerical method}{equation.2.9a}{}}
 \newlabel{eq:streamvort_wave}{{9b}{3}{Numerical method}{equation.2.9b}{}}
 \newlabel{nonlinearwave}{{10}{3}{Numerical method}{equation.2.10}{}}
-\citation{Orszag_Alias,pope2000turbulent}
-\citation{Bowman_dealias,Phillips1959}
-\citation{Python_spectral,Bowman_dealias,Orszag_Alias}
 \citation{RK3CN}
 \citation{RK3CN}
 \citation{RK3CN}
 \citation{MLstandardise}
 \citation{ADAM}
+\citation{Kraichnan,batchelor1969computation,leith1971atmospheric}
+\citation{Kraichnan,batchelor1969computation,leith1971atmospheric}
+\citation{Kraichnan,batchelor1969computation,leith1971atmospheric}
 \@writefile{toc}{\contentsline {subsection}{\numberline {II.B}Training CNN}{4}{subsection.2.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {III}Results}{4}{section.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {III}Results}{5}{section.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {III.A}DNS results}{5}{subsection.3.1}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Vorticity field of the 2D-DHIT at Re = 32000. Self-similarity begins at t=1.0 and simulation ends at t=4.0\relax }}{5}{figure.caption.1}\protected@file@percent }
+\providecommand*\caption@xref[2]{\@setref\relax\@undefined{#1}}
+\newlabel{fig:DNS_field}{{1}{5}{Vorticity field of the 2D-DHIT at Re = 32000. Self-similarity begins at t=1.0 and simulation ends at t=4.0\relax }{figure.caption.1}{}}
+\citation{2022_LES_CNN,pawar2020priori}
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Turbulent kinetic energy spectrum. The Initial energy distribution is overlaid with the analytical equation and the inertial subrange as predicted in \cite  {Kraichnan,batchelor1969computation,leith1971atmospheric} is clearly seen after t = 1.0\relax }}{6}{figure.caption.2}\protected@file@percent }
+\newlabel{fig:TKE_1}{{2}{6}{Turbulent kinetic energy spectrum. The Initial energy distribution is overlaid with the analytical equation and the inertial subrange as predicted in \cite {Kraichnan,batchelor1969computation,leith1971atmospheric} is clearly seen after t = 1.0\relax }{figure.caption.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {III.B}A priori CNN}{6}{subsection.3.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {III.C}A posteriori CNN}{7}{subsection.3.3}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces The standard deviation for the SGS terms rises sharply before decaying.\relax }}{7}{figure.caption.3}\protected@file@percent }
 \bibdata{references}
 \bibcite{xie2019artificial}{{1}{2019}{{Xie et~al.}}{{Xie, Wang, Li, Wan, and Chen}}}
 \bibcite{2022_LES_CNN}{{2}{2022}{{Guan et~al.}}{{Guan, Chattopadhyay, Subel, and Hassanzadeh}}}
@@ -72,14 +85,15 @@
 \bibcite{Python_spectral}{{12}{2012}{{San and Staples}}{{}}}
 \bibcite{cooley1965algorithm}{{13}{1965}{{Cooley and Tukey}}{{}}}
 \bibcite{Orszag_Alias}{{14}{1971}{{Orszag}}{{}}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {III.A}DNS results}{5}{subsection.3.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {III.B}A priori CNN}{5}{subsection.3.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {III.C}A posteriori CNN}{5}{subsection.3.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {IV}Conclusion}{5}{section.4}\protected@file@percent }
-\newlabel{appendix:A}{{IV}{5}{}{section.4}{}}
 \bibcite{Bowman_dealias}{{15}{2014}{{Bowman}}{{}}}
 \bibcite{Phillips1959}{{16}{1959}{{Phillips}}{{}}}
 \bibcite{RK3CN}{{17}{2000}{{Orlandi}}{{}}}
 \bibcite{MLstandardise}{{18}{2019}{{Singh and Singh}}{{}}}
 \bibcite{ADAM}{{19}{2014}{{Kingma and Ba}}{{}}}
-\gdef \@abspage@last{6}
+\bibcite{Kraichnan}{{20}{1967}{{Kraichnan}}{{}}}
+\@writefile{toc}{\contentsline {section}{\numberline {IV}Conclusion}{8}{section.4}\protected@file@percent }
+\newlabel{appendix:A}{{IV}{8}{}{section.4}{}}
+\bibcite{batchelor1969computation}{{21}{1969}{{Batchelor}}{{}}}
+\bibcite{leith1971atmospheric}{{22}{1971}{{Leith}}{{}}}
+\bibcite{pawar2020priori}{{23}{2020}{{Pawar et~al.}}{{Pawar, San, Rasheed, and Vedula}}}
+\gdef \@abspage@last{9}

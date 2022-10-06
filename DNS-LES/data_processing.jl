@@ -959,13 +959,13 @@ function main()
             yscale = :log,
             label=latexstring("LES-NM"))
 
-        # p1 = plot!(kc,en_LES_CNN[2:end],
-        #     lw=2,
-        #     ls = :solid,
-        #     linecolor = :magenta,
-        #     xscale = :log,
-        #     yscale = :log,
-        #     label=latexstring("LES-CNN"))
+        p1 = plot!(kc,en_LES_CNN[2:end],
+            lw=2,
+            ls = :solid,
+            linecolor = :lime,
+            xscale = :log,
+            yscale = :log,
+            label=latexstring("LES-CNN"))
 
         p1 = plot!(k,exp.(-(1/24)*k.^2*Δ^2),
             lw=1,
@@ -1160,12 +1160,19 @@ anim = @animate for i ∈ 0:2:400
     plot(p1)
 end
 gif(anim, "Vorticity_Re32000_full.gif", fps =50)
-stds = zeros(8001,3)
-for i in 0:8000
-    file_input = "spectral/Training set/"*folder*"/05_LES_vorticity/w_"*string(i)*".csv"
-    stds[i+1,1] = std(readdlm(file_input, ',', Float64))
-    file_input = "spectral/Training set/"*folder*"/07_LES_streamfunction/s_"*string(i)*".csv"
-    stds[i+1,2] = std(readdlm(file_input, ',', Float64))
-    file_input = "spectral/Training set/"*folder*"/03_subgrid_scale_term/sgs_"*string(i)*".csv"
-    stds[i+1,3] = std(readdlm(file_input, ',', Float64))
+# stds = zeros(8001,3)
+# for i in 0:8000
+#     file_input = "spectral/Training set/"*folder*"/05_LES_vorticity/w_"*string(i)*".csv"
+#     stds[i+1,1] = std(readdlm(file_input, ',', Float64))
+#     file_input = "spectral/Training set/"*folder*"/07_LES_streamfunction/s_"*string(i)*".csv"
+#     stds[i+1,2] = std(readdlm(file_input, ',', Float64))
+#     file_input = "spectral/Training set/"*folder*"/03_subgrid_scale_term/sgs_"*string(i)*".csv"
+#     stds[i+1,3] = std(readdlm(file_input, ',', Float64))
+# end
+for i = 1:10
+    s1 = heatmap(cpu(CNN_model(gpu(input_test[:,:,:,ind[i]:ind[i]]))[:,:]),clim=(-8,8),c=:seismic,title="CNN")
+    s2 = heatmap(output_test[:,:,1,ind[i]],clim=(-8,8),c=:seismic,title="True")
+    #cc = corr_coeff(gpu(input_test[:,:,:,ind[i]:ind[i]]),output_test[:,:,1,ind[i]])
+    plot(s1,s2,size=(1000,450),axis=nothing)
+    savefig("SGS_comp_"*string(i)*".png")
 end

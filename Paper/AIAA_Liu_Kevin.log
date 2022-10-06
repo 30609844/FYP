@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.24 (MiKTeX 22.3) (preloaded format=pdflatex 2022.4.5)  6 OCT 2022 04:49
+This is pdfTeX, Version 3.141592653-2.6-1.40.24 (MiKTeX 22.3) (preloaded format=pdflatex 2022.4.5)  7 OCT 2022 02:45
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -823,43 +823,64 @@ LaTeX Font Info:    Font shape `T1/ntxtlf/m/n' will be
 (Font)              scaled to size 12.0pt on input line 25.
 LaTeX Font Info:    Font shape `T1/ntxtlf/b/n' will be
 (Font)              scaled to size 12.0pt on input line 25.
- [1
-
-{C:/Users/Kevin/AppData/Local/MiKTeX/fonts/map/pdftex/pdftex.map}]
 LaTeX Font Info:    Font shape `T1/ntxtlf/m/sc' will be
-(Font)              scaled to size 10.0pt on input line 58.
+(Font)              scaled to size 10.0pt on input line 55.
 Package microtype Info: Character `029' is missing
 (microtype)             in font `T1/ntxtlf/m/sc/10'.
 (microtype)             Ignoring protrusion settings for this character.
 LaTeX Font Info:    Font shape `T1/ntxtlf/m/n' will be
-(Font)              scaled to size 16.53pt on input line 58.
+(Font)              scaled to size 16.53pt on input line 55.
 LaTeX Font Info:    Font shape `T1/ntxtlf/m/n' will be
-(Font)              scaled to size 24.45271pt on input line 58.
+(Font)              scaled to size 24.45271pt on input line 55.
 Package lettrine.sty Info: Targeted height = 16.53pt
 (lettrine.sty)             (for loversize=0, accent excluded),
 (lettrine.sty)             Lettrine height = 16.53001pt (T);
-(lettrine.sty)             reported on input line 58.
- [2] [3] [4] (AIAA_Liu_Kevin.bbl
+(lettrine.sty)             reported on input line 55.
+ [1
+
+{C:/Users/Kevin/AppData/Local/MiKTeX/fonts/map/pdftex/pdftex.map}] [2] [3]
+<DNS_field_1.png, id=144, 1405.25pt x 602.25pt>
+File: DNS_field_1.png Graphic file (type png)
+<use DNS_field_1.png>
+Package pdftex.def Info: DNS_field_1.png  used on input line 181.
+(pdftex.def)             Requested size: 375.80544pt x 161.05663pt.
+<DNS_field_4.png, id=145, 1405.25pt x 602.25pt>
+File: DNS_field_4.png Graphic file (type png)
+<use DNS_field_4.png>
+Package pdftex.def Info: DNS_field_4.png  used on input line 182.
+(pdftex.def)             Requested size: 375.80544pt x 161.05663pt.
+<TKE_1.png, id=146, 1405.25pt x 903.375pt>
+File: TKE_1.png Graphic file (type png)
+<use TKE_1.png>
+Package pdftex.def Info: TKE_1.png  used on input line 188.
+(pdftex.def)             Requested size: 375.80544pt x 241.58495pt.
+ [4] [5 <./DNS_field_1.png> <./DNS_field_4.png>] [6 <./TKE_1.png>]
+<STDs.png, id=183, 602.25pt x 401.5pt>
+File: STDs.png Graphic file (type png)
+<use STDs.png>
+Package pdftex.def Info: STDs.png  used on input line 201.
+(pdftex.def)             Requested size: 352.31625pt x 234.88573pt.
+ [7 <./STDs.png>] (AIAA_Liu_Kevin.bbl
 LaTeX Font Info:    Font shape `T1/ntxtlf/m/n' will be
 (Font)              scaled to size 9.0pt on input line 1.
 LaTeX Font Info:    Font shape `T1/ntxtlf/m/it' will be
 (Font)              scaled to size 9.0pt on input line 13.
- [5]) [6] (AIAA_Liu_Kevin.aux)
+ [8]) [9] (AIAA_Liu_Kevin.aux)
 Package rerunfilecheck Info: File `AIAA_Liu_Kevin.out' has not changed.
 (rerunfilecheck)             Checksum: F7E4923339B997E908644143B83D46E2;1308.
  ) 
 Here is how much of TeX's memory you used:
- 23392 strings out of 478582
- 433644 string characters out of 2844345
- 723079 words of memory out of 3000000
- 41022 multiletter control sequences out of 15000+600000
- 555690 words of font info for 197 fonts, out of 8000000 for 9000
+ 23456 strings out of 478582
+ 434784 string characters out of 2844345
+ 724631 words of memory out of 3000000
+ 41066 multiletter control sequences out of 15000+600000
+ 555857 words of font info for 199 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 84i,10n,131p,1362b,982s stack positions out of 10000i,1000n,20000p,200000b,80000s
+ 84i,10n,131p,1362b,994s stack positions out of 10000i,1000n,20000p,200000b,80000s
 {C:/Users/Kevin/AppData/Local/Programs/MiKTeX/fonts/enc/dvips/newtx/ntx-ec-tlf-pc.enc}{C:/Users/Kevin/AppData/Local/Programs/MiKTeX/fonts/enc/dvips/newtx/ntx-ot1-tlf.enc}{C:/Users/Kevin/AppData/Local/Programs/MiKTeX/fonts/enc/dvips/newtx/ntx-ec-tlf.enc}{C:/Users/Kevin/AppData/Local/Programs/MiKTeX/fonts/enc/dvips/tex-gyre/q-ts1.enc}<C:/Users/Kevin/AppData/Local/Programs/MiKTeX/fonts/type1/public/newtx/NewTXMI.pfb><C:/Users/Kevin/AppData/Local/Programs/MiKTeX/fonts/type1/public/newtx/NewTXMI5.pfb><C:/Users/Kevin/AppData/Local/Programs/MiKTeX/fonts/type1/public/newtx/NewTXMI7.pfb><C:/Users/Kevin/AppData/Local/Programs/MiKTeX/fonts/type1/public/tex-gyre/qtmr.pfb><C:/Users/Kevin/AppData/Local/Programs/MiKTeX/fonts/type1/public/newtx/txexs.pfb><C:/Users/Kevin/AppData/Local/Programs/MiKTeX/fonts/type1/public/newtx/txmiaX.pfb><C:/Users/Kevin/AppData/Local/Programs/MiKTeX/fonts/type1/public/txfonts/txsyb.pfb><C:/Users/Kevin/AppData/Local/Programs/MiKTeX/fonts/type1/public/newtx/txsys.pfb><C:/Users/Kevin/AppData/Local/Programs/MiKTeX/fonts/type1/public/newtx/ztmb.pfb><C:/Users/Kevin/AppData/Local/Programs/MiKTeX/fonts/type1/public/newtx/ztmr.pfb><C:/Users/Kevin/AppData/Local/Programs/MiKTeX/fonts/type1/public/newtx/ztmri.pfb>
-Output written on AIAA_Liu_Kevin.pdf (6 pages, 234055 bytes).
+Output written on AIAA_Liu_Kevin.pdf (9 pages, 2174731 bytes).
 PDF statistics:
- 256 PDF objects out of 1000 (max. 8388607)
- 59 named destinations out of 1000 (max. 500000)
- 40025 words of extra memory for PDF output out of 42996 (max. 10000000)
+ 294 PDF objects out of 1000 (max. 8388607)
+ 70 named destinations out of 1000 (max. 500000)
+ 40045 words of extra memory for PDF output out of 42996 (max. 10000000)
 

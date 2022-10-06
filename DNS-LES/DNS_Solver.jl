@@ -11,10 +11,12 @@
 # hybrid third-order Runge-Kutta implicit Crank-Nicolson scheme for time integration. 
 
 ##
-using Printf, Random
 println(string(Threads.nthreads())*" THREADS")
-using FFTW
+using FFTW, Zygote, Flux
 FFTW.set_num_threads(Threads.nthreads())
+using Flux: onehotbatch, onecold, crossentropy, throttle, loadparams!
+using BSON: @load, @save
+using Printf, Random
 using Plots, LaTeXStrings
 using Plots.PlotMeasures
 using DelimitedFiles
@@ -333,6 +335,59 @@ function filter_gauss(Δ,k2,uf)
     
     return uf_filtered
 end 
+
+#%% Build CNN model
+function build_model(conv_depth, kernel_size, act_func)
+
+    @printf("CNN depth: %i\n",conv_depth)
+    @printf("Kernel size: %i\n",kernel_size[1])
+  
+    model = Chain(
+      Conv(kernel_size,2 => conv_depth,act_func,pad=SamePad()),
+      Conv(kernel_size,conv_depth => conv_depth,act_func,pad=SamePad()),
+      Conv(kernel_size,conv_depth => conv_depth,act_func,pad=SamePad()),
+      Conv(kernel_size,conv_depth => conv_depth,act_func,pad=SamePad()),
+      Conv(kernel_size,conv_depth => conv_depth,act_func,pad=SamePad()),
+      Conv(kernel_size,conv_depth => conv_depth,act_func,pad=SamePad()),
+      Conv(kernel_size,conv_depth => conv_depth,act_func,pad=SamePad()),
+      Conv(kernel_size,conv_depth => conv_depth,act_func,pad=SamePad()),
+      Conv(kernel_size,conv_depth => conv_depth,act_func,pad=SamePad()),
+      Conv(kernel_size,conv_depth => conv_depth,act_func,pad=SamePad()),
+      Conv(kernel_size,conv_depth => 1,identity,pad=SamePad()),
+      ) #|> gpu
+    return model
+  
+end
+
+#%% CNN Closure terms
+function LES_closure(wf,k2,iP,P,model)
+
+    # coarsen the data along with the size of the data 
+    
+    # Inputs
+    # ------
+    # wf : vorticity field in frequency domain (excluding periodic boundaries)
+    # k2 : absolute wave number over 2D domain
+    # iP : IFFT matrix
+    # P : FFT matrix
+    # model : Closure model
+    
+    # Output
+    # ------
+    # Π : LES closure term
+
+    sf = @. wf/k2
+    nx = size(wf)[1]
+    w = Flux.normalise(real(iP*wf))
+    s = Flux.normalise(real(iP*sf))
+    input = reshape([w;s],nx,nx,2,1)
+    input = gpu(Float32.(input))
+    Π = cpu(model(input)[:,:])
+    Π = Flux.normalise(Π)
+    Π = Float64.(Π)
+    Π = -(P*Π)
+    return Π
+end
 
 #%% Compute the Jacobian with dealiasing 
 function nonlineardealiased(nx,ny,kx,ky,k2,wf,iP,P,iP2,rP2,opt)   
@@ -778,6 +833,14 @@ function main()
     istart = Int64(l1[13])  #istart; last saved file (starting point)
 
     freq = Int(nt/ns)
+
+    params = (conv_depth = 64, kernel_size = (5,5), act_func=relu)
+    CNN_model = build_model(params...)
+    if isfile("CNN_model.bson")
+        @load "CNN_model.bson" CNN_model
+    end
+    CNN_model = CNN_model |> gpu
+
     @printf("DNS RESOLUTION: %ix%i\n",nd,nd)
     @printf("LES RESOLUTION: %ix%i\n",ndc,ndc)
     @printf("REYNOLDS NUMBER = %.0f\n",re)
@@ -876,12 +939,15 @@ function main()
         w0[:,:] = vm_ic(nx,ny) # vortex-merger problem
     elseif (ipr == 3)
         w0[:,:] = decay_ic(nx,ny,dx,dy,iP) # decaying homegeneous isotropic turbulence problem
+    elseif (ipr == 4)
+        file_input = "spectral/"*folder*"/w_seed.csv"
+        w0[:,:] = readdlm(file_input, ',', Float64) # FDNS start point
     end
     #%%  
     ifile = 0
     tchkp = ichkp*freq*istart*dt
-    folder = "data_"*string(nx)*"_re_"*string(Int(re))*"_v2"
-    if ichkp == 0
+    folder = "data_"*string(nx)*"_re_"*string(Int(re))*"_v3"
+    if ichkp == 0 && ipr != 4
         wnf[:,:] = P*(complex.(w0[1:end-1,1:end-1],0.0)) # fourier space forward
         s[:,:] = fps(nx,ny,k2,wnf,iP)
         w[:,:] = wave2phy(nx,ny,wnf,iP)
@@ -903,7 +969,7 @@ function main()
                 
         sgs = jc - jcoarse # THIS SGS IS SUBTRACTED ON THE RHS
         write_data(jc,jcoarse,sgs,w,s,w_LES,s_LES,0,folder)
-    elseif ichkp == 1
+    elseif ichkp == 1 && ipr != 4
         println(istart)
         file_input = "spectral/"*folder*"/04_DNS_vorticity/w_"*string(0)*".csv"
         w0[:,:] = readdlm(file_input, ',', Float64)
@@ -930,23 +996,28 @@ function main()
     # time integration using hybrid third-order Runge-Kutta implicit Crank-Nicolson scheme
     # refer to Orlandi: Fluid flow phenomenon
 
-
-    for n in Int(ichkp*istart*freq)+1:nt
+    sgstd = readdlm("spectral/stds.csv",',',Float64)[:,3]
+    tinit = Int(ichkp*istart*freq)+1
+    if ipr == 4
+        tinit = 1001
+        nt += tinit
+    end
+    for n in tinit:nt
         looptime = time()
         t = n*dt
         # 1st step
-        jnf[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,wnf,iP,P,iP2,rP2,opt)    
-        w1f[:,:] = @. ((1.0 - d1)/(1.0 + d1))*wnf + (g1*dt*jnf)/(1.0 + d1)
+        jnf[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,filter_gauss(Δ,k2,wnf),iP,P,iP2,rP2,opt) + sgstd[2*n-1]*LES_closure(filter_gauss(Δ,k2,wnf),k2,iP,P,CNN_model)   
+        w1f[:,:] = @. ((1.0 - d1)/(1.0 + d1))*filter_gauss(Δ,k2,wnf) + (g1*dt*jnf)/(1.0 + d1) 
         w1f[1,1] = 0.0
 
         # 2nd step
-        j1f[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,w1f,iP,P,iP2,rP2,opt)
+        j1f[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,w1f,iP,P,iP2,rP2,opt) + sgstd[2*n-1]*LES_closure(filter_gauss(Δ,k2,w1f),k2,iP,P,CNN_model)
         w2f[:,:] = @. ((1.0 - d2)/(1.0 + d2))*w1f + (r2*dt*jnf + g2*dt*j1f)/(1.0 + d2)
         w2f[1,1] = 0.0
 
         # 3rd step
-        j2f[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,w2f,iP,P,iP2,rP2,opt)
-        wnf[:,:] = @. ((1.0 - d3)/(1.0 + d3))*w2f + (r3*dt*j1f + g3*dt*j2f)/(1.0 + d3)
+        j2f[:,:] = nonlineardealiased(nx,ny,kx,ky,k2,w2f,iP,P,iP2,rP2,opt) + sgstd[2*n-1]*LES_closure(filter_gauss(Δ,k2,w2f),k2,iP,P,CNN_model)
+        wnf[:,:] = @. ((1.0 - d3)/(1.0 + d3))*w2f + (r3*dt*j1f + g3*dt*j2f)/(1.0 + d3) 
         wnf[1,1] = 0.0
         a = time() - looptime
         @printf("Avg. %.5fs per RK3 step\n",a/3)

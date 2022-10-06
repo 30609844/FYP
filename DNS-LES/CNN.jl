@@ -73,7 +73,7 @@ function main()
   trainN=6000
   testN=300
   lead=1;
-  minibatch_size = 40
+  minibatch_size = 30
   num_epochs = 20
   pool_size = 2
   drop_prob=0.0
@@ -131,7 +131,7 @@ function main()
   for epoch in 1:num_epochs
     @printf("EPOCH: %2i\n",epoch)
     # Permuted training data
-    train_idxs = shuffle(1:trainN*numDataset)
+    train_idxs = shuffle(0:trainN*numDataset-1)
     mb_idxs = partition(1:trainN*numDataset, minibatch_size)
 
     # Iterating over every batch
