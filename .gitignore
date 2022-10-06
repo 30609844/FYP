@@ -6,3 +6,4 @@ DNS-LES/spectral
 *.svg
 *.png
 *.pdf
+!Paper/.gitkeep
