@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.24 (MiKTeX 22.3) (preloaded format=pdflatex 2022.4.5)  7 OCT 2022 02:45
+This is pdfTeX, Version 3.141592653-2.6-1.40.24 (MiKTeX 22.3) (preloaded format=pdflatex 2022.4.5)  7 OCT 2022 10:45
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -870,15 +870,15 @@ Package rerunfilecheck Info: File `AIAA_Liu_Kevin.out' has not changed.
 (rerunfilecheck)             Checksum: F7E4923339B997E908644143B83D46E2;1308.
  ) 
 Here is how much of TeX's memory you used:
- 23456 strings out of 478582
- 434784 string characters out of 2844345
+ 23458 strings out of 478582
+ 434824 string characters out of 2844345
  724631 words of memory out of 3000000
  41066 multiletter control sequences out of 15000+600000
- 555857 words of font info for 199 fonts, out of 8000000 for 9000
+ 555943 words of font info for 200 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 84i,10n,131p,1362b,994s stack positions out of 10000i,1000n,20000p,200000b,80000s
+ 84i,10n,131p,1362b,990s stack positions out of 10000i,1000n,20000p,200000b,80000s
 {C:/Users/Kevin/AppData/Local/Programs/MiKTeX/fonts/enc/dvips/newtx/ntx-ec-tlf-pc.enc}{C:/Users/Kevin/AppData/Local/Programs/MiKTeX/fonts/enc/dvips/newtx/ntx-ot1-tlf.enc}{C:/Users/Kevin/AppData/Local/Programs/MiKTeX/fonts/enc/dvips/newtx/ntx-ec-tlf.enc}{C:/Users/Kevin/AppData/Local/Programs/MiKTeX/fonts/enc/dvips/tex-gyre/q-ts1.enc}<C:/Users/Kevin/AppData/Local/Programs/MiKTeX/fonts/type1/public/newtx/NewTXMI.pfb><C:/Users/Kevin/AppData/Local/Programs/MiKTeX/fonts/type1/public/newtx/NewTXMI5.pfb><C:/Users/Kevin/AppData/Local/Programs/MiKTeX/fonts/type1/public/newtx/NewTXMI7.pfb><C:/Users/Kevin/AppData/Local/Programs/MiKTeX/fonts/type1/public/tex-gyre/qtmr.pfb><C:/Users/Kevin/AppData/Local/Programs/MiKTeX/fonts/type1/public/newtx/txexs.pfb><C:/Users/Kevin/AppData/Local/Programs/MiKTeX/fonts/type1/public/newtx/txmiaX.pfb><C:/Users/Kevin/AppData/Local/Programs/MiKTeX/fonts/type1/public/txfonts/txsyb.pfb><C:/Users/Kevin/AppData/Local/Programs/MiKTeX/fonts/type1/public/newtx/txsys.pfb><C:/Users/Kevin/AppData/Local/Programs/MiKTeX/fonts/type1/public/newtx/ztmb.pfb><C:/Users/Kevin/AppData/Local/Programs/MiKTeX/fonts/type1/public/newtx/ztmr.pfb><C:/Users/Kevin/AppData/Local/Programs/MiKTeX/fonts/type1/public/newtx/ztmri.pfb>
-Output written on AIAA_Liu_Kevin.pdf (9 pages, 2174731 bytes).
+Output written on AIAA_Liu_Kevin.pdf (9 pages, 2175074 bytes).
 PDF statistics:
  294 PDF objects out of 1000 (max. 8388607)
  70 named destinations out of 1000 (max. 500000)
