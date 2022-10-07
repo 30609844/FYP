@@ -1,6 +1,6 @@
 DNS-LES/spectral
 *.sh
-*.out
+DNS-LES/*.out
 *.gif
 *.bson
 *.svg
